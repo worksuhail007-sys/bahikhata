@@ -62,12 +62,18 @@ button {
 }
 
 .card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(10px);
   transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 1rem;
+  }
 }
 
 .card:hover {
@@ -89,6 +95,13 @@ button {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 0 1rem;
+  }
 }
 
 .flex-center {

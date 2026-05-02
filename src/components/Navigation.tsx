@@ -21,12 +21,30 @@ export default function Navigation() {
           <span className={styles.logoText}>BahiKhata</span>
         </Link>
         <div className={styles.links}>
-          <Link href="/" className={styles.link}>Dashboard</Link>
-          <Link href="/workers" className={styles.link}>Workers</Link>
-          <Link href="/logs" className={styles.link}>Attendance</Link>
-          <Link href="/materials" className={styles.link}>Materials</Link>
-          <Link href="/payments" className={styles.link}>Payments</Link>
-          <button onClick={handleLogout} className={styles.logoutBtn}>🔓 Logout</button>
+          <Link href="/" className={styles.link}>
+            <span className={styles.navIcon}>🏠</span>
+            <span className={styles.navLabel}>Home</span>
+          </Link>
+          <Link href="/workers" className={styles.link}>
+            <span className={styles.navIcon}>👷</span>
+            <span className={styles.navLabel}>Workers</span>
+          </Link>
+          <Link href="/logs" className={styles.link}>
+            <span className={styles.navIcon}>📅</span>
+            <span className={styles.navLabel}>Logs</span>
+          </Link>
+          <Link href="/materials" className={styles.link}>
+            <span className={styles.navIcon}>🧱</span>
+            <span className={styles.navLabel}>Materials</span>
+          </Link>
+          <Link href="/payments" className={styles.link}>
+            <span className={styles.navIcon}>💸</span>
+            <span className={styles.navLabel}>Payments</span>
+          </Link>
+          <button onClick={handleLogout} className={styles.logoutBtn}>
+            <span className={styles.navIcon}>🔓</span>
+            <span className={styles.navLabel}>Logout</span>
+          </button>
         </div>
       </div>
     </nav>

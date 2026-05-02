@@ -22,8 +22,9 @@ export default function LoginPage() {
     });
 
     if (res.ok) {
-      router.push('/');
-      router.refresh();
+      // Force a hard redirect to bypass Next.js client-side cache staleness
+      // This ensures the middleware sees the newly set cookie immediately
+      window.location.href = '/';
     } else {
       setError('Invalid email or password. Please try again.');
       setLoading(false);

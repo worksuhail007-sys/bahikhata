@@ -39,6 +39,15 @@
 .links {
   display: flex;
   gap: 2rem;
+  align-items: center;
+}
+
+.navIcon {
+  display: none;
+}
+
+.navLabel {
+  display: block;
 }
 
 .link {
@@ -72,9 +81,53 @@
 
 @media (max-width: 640px) {
   .logoText {
-    display: none;
+    display: block; /* Keep logo on top left */
   }
+  
   .links {
-    gap: 1rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(15, 15, 15, 0.95);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--glass-border);
+    padding: 0.5rem 1rem;
+    padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+    justify-content: space-between;
+    gap: 0;
+    z-index: 1000;
+  }
+  
+  .link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+  }
+  
+  .navIcon {
+    display: block;
+    font-size: 1.25rem;
+  }
+  
+  .navLabel {
+    display: block;
+  }
+
+  .logoutBtn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    border: none;
+    background: transparent;
+    padding: 0;
+  }
+  
+  .logoutBtn:hover {
+    background: transparent;
   }
 }
