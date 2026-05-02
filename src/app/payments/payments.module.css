@@ -1,0 +1,164 @@
+.formSection {
+  margin-bottom: 3rem;
+  max-width: 600px;
+}
+
+.archivedToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.archivedToggle:hover {
+  color: var(--primary);
+}
+
+.archivedToggle input {
+  cursor: pointer;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inputGroup label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #999;
+}
+
+.inputGroup input,
+.inputGroup select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.9375rem;
+}
+
+.inputGroup select option {
+  background: #111;
+}
+
+.formActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.paymentList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.paymentItem {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.workerName {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.25rem;
+}
+
+.paymentDate {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.notes {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #999;
+  font-style: italic;
+}
+
+.attachmentPreview {
+  margin-top: 0.75rem;
+}
+
+.attachmentPreview img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.attachmentPreview img:hover {
+  transform: scale(1.1);
+}
+
+.paymentAmount {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.currency {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.deleteBtn {
+  color: #444;
+  font-size: 1.5rem;
+  margin-left: 1rem;
+}
+
+.deleteBtn:hover {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+  
+  .paymentItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .paymentAmount {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+}
