@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 import { 
-  getWorkers, getAttendance, getPayments, Worker, Attendance, 
-  Payment, getWorkerBalance, getProjects, Project 
+  getWorkers, getAttendance, getPayments, getMaterials, Worker, Attendance, 
+  Payment, Material, getWorkerBalance, getProjects, Project 
 } from '@/lib/storage';
 
 export default function Home() {
@@ -13,18 +13,21 @@ export default function Home() {
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [todayLogs, setTodayLogs] = useState<Attendance[]>([]);
   const [totalBalance, setTotalBalance] = useState(0);
+  const [totalMaterialCost, setTotalMaterialCost] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [w, a, p, proj] = await Promise.all([
+        const [w, a, p, proj, m] = await Promise.all([
           getWorkers(),
           getAttendance(),
           getPayments(),
-          getProjects()
+          getProjects(),
+          getMaterials()
         ]);
         
         const activeWorkers = w.filter(worker => worker.status === 'active');
@@ -35,6 +38,7 @@ export default function Home() {
         setAttendance(activeAttendance);
         setPayments(activePayments);
         setProjects(proj);
+        setMaterials(m);
 
         const today = new Date().toISOString().split('T')[0];
         setTodayLogs(activeAttendance.filter(log => log.date === today));
@@ -43,8 +47,13 @@ export default function Home() {
         const balances = await Promise.all(
           activeWorkers.map(worker => getWorkerBalance(worker.id))
         );
-        const total = balances.reduce((sum, b) => sum + b.balance, 0);
-        setTotalBalance(total);
+        const totalBal = balances.reduce((sum, b) => sum + b.balance, 0);
+        setTotalBalance(totalBal);
+        
+        // Calculate Total Material Cost
+        const totalMat = m.reduce((sum, mat) => sum + mat.totalCost, 0);
+        setTotalMaterialCost(totalMat);
+
       } catch (err) {
         console.error('Failed to load dashboard:', err);
       } finally {
@@ -66,6 +75,8 @@ export default function Home() {
     );
   }
 
+  const grandTotalCost = totalBalance + totalMaterialCost;
+
   return (
     <div className={`${styles.container} container fade-in`}>
       <header className={styles.header}>
@@ -74,8 +85,8 @@ export default function Home() {
           <Link href="/logs?action=new" className="btn-primary">
             <span>+</span> Attendance
           </Link>
-          <Link href="/payments?action=new" className="btn-primary" style={{ background: 'var(--secondary)', color: '#fff' }}>
-            <span>+</span> Payment
+          <Link href="/materials?action=new" className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>
+            <span>+</span> Material
           </Link>
         </div>
       </header>
@@ -87,9 +98,9 @@ export default function Home() {
           <p className={styles.statSub}>Across {projects.length} sites</p>
         </div>
         <div className="card">
-          <p className={styles.statLabel}>Today's Attendance</p>
-          <h3 className={styles.statValue}>{todayLogs.length}</h3>
-          <p className={styles.statSub}>Logged for today</p>
+          <p className={styles.statLabel}>Total Project Cost</p>
+          <h3 className={`${styles.statValue} ${styles.due}`}>₹{grandTotalCost}</h3>
+          <p className={styles.statSub}>Materials (₹{totalMaterialCost}) + Labour Due (₹{totalBalance})</p>
         </div>
         <div className="card">
           <p className={styles.statLabel}>Total Balance Due</p>
@@ -127,22 +138,22 @@ export default function Home() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.subTitle}>Recent Payments</h2>
+          <h2 className={styles.subTitle}>Recent Material Purchases</h2>
           <div className={styles.activityList}>
-            {payments.length === 0 ? (
+            {materials.length === 0 ? (
               <div className={`${styles.empty} glass`}>
-                <p>No payments recorded yet.</p>
+                <p>No materials recorded yet.</p>
               </div>
             ) : (
-              payments.slice(0, 6).map((p) => {
-                const worker = workers.find(w => w.id === p.workerId);
+              materials.slice(0, 6).map((m) => {
+                const project = projects.find(p => p.id === m.projectId);
                 return (
-                  <div key={p.id} className={`${styles.activityItem} glass`}>
+                  <div key={m.id} className={`${styles.activityItem} glass`}>
                     <div className={styles.activityInfo}>
-                      <p className={styles.activityWorker}>{worker?.name || 'Worker'}</p>
-                      <p className={styles.activityMeta}>{new Date(p.date).toLocaleDateString()}</p>
+                      <p className={styles.activityWorker}>{m.name}</p>
+                      <p className={styles.activityMeta}>{new Date(m.date).toLocaleDateString()} • {project?.name || 'Site'}</p>
                     </div>
-                    <p className={styles.paymentVal}>₹{p.amount}</p>
+                    <p className={styles.paymentVal}>₹{m.totalCost}</p>
                   </div>
                 );
               })
@@ -157,12 +168,15 @@ export default function Home() {
           <div className={styles.siteGrid}>
             {projects.map(proj => {
               const siteWorkers = workers.filter(w => w.projectId === proj.id);
-              // Note: For a live dashboard, we might want to pre-calculate these site balances
+              const siteMaterials = materials.filter(m => m.projectId === proj.id);
+              const siteMaterialCost = siteMaterials.reduce((sum, m) => sum + m.totalCost, 0);
+              
               return (
                 <div key={proj.id} className="card">
                   <h4 style={{ color: 'var(--primary)', marginBottom: '0.5rem' }}>{proj.name}</h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem' }}>
                      <span>{siteWorkers.length} Workers</span>
+                     <span>Material Cost: ₹{siteMaterialCost}</span>
                   </div>
                 </div>
               );

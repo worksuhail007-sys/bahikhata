@@ -37,6 +37,20 @@ export interface Payment {
   image?: string;
 }
 
+export interface Material {
+  id: string;
+  projectId: string;
+  name: string;
+  vendor?: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalCost: number;
+  date: string;
+  notes?: string;
+  image?: string;
+}
+
 // --- Projects ---
 export const getProjects = async (): Promise<Project[]> => {
   const { data, error } = await supabase.from('projects').select('*').order('name');
@@ -205,6 +219,60 @@ export const addPayment = async (payment: Omit<Payment, 'id'>) => {
 
 export const deletePayment = async (id: string) => {
   const { error } = await supabase.from('payments').delete().eq('id', id);
+  if (error) throw error;
+};
+
+// --- Materials ---
+export const getMaterials = async (): Promise<Material[]> => {
+  const { data, error } = await supabase
+    .from('materials')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching materials:', error);
+    return [];
+  }
+
+  return (data || []).map(m => ({
+    ...m,
+    projectId: m.project_id,
+    unitPrice: Number(m.unit_price),
+    totalCost: Number(m.total_cost),
+    image: m.image_url
+  }));
+};
+
+export const addMaterial = async (material: Omit<Material, 'id'>) => {
+  const { data, error } = await supabase
+    .from('materials')
+    .insert([{
+      project_id: material.projectId,
+      name: material.name,
+      vendor: material.vendor,
+      quantity: material.quantity,
+      unit: material.unit,
+      unit_price: material.unitPrice,
+      total_cost: material.totalCost,
+      date: material.date,
+      notes: material.notes,
+      image_url: material.image
+    }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { 
+    ...data, 
+    projectId: data.project_id, 
+    unitPrice: Number(data.unit_price), 
+    totalCost: Number(data.total_cost), 
+    image: data.image_url 
+  };
+};
+
+export const deleteMaterial = async (id: string) => {
+  const { error } = await supabase.from('materials').delete().eq('id', id);
   if (error) throw error;
 };
 

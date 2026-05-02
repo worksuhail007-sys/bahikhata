@@ -24,6 +24,7 @@ export default function Navigation() {
           <Link href="/" className={styles.link}>Dashboard</Link>
           <Link href="/workers" className={styles.link}>Workers</Link>
           <Link href="/logs" className={styles.link}>Attendance</Link>
+          <Link href="/materials" className={styles.link}>Materials</Link>
           <Link href="/payments" className={styles.link}>Payments</Link>
           <button onClick={handleLogout} className={styles.logoutBtn}>🔓 Logout</button>
         </div>
