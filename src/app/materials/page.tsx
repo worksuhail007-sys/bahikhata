@@ -3,14 +3,16 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './materials.module.css';
-import { getMaterials, addMaterial, deleteMaterial, Material, Project, getProjects } from '@/lib/storage';
+import { getMaterials, addMaterial, updateMaterial, deleteMaterial, Material, Project, getProjects } from '@/lib/storage';
 import ImageUpload from '@/components/ImageUpload';
+import Link from 'next/link';
 
 function MaterialsContent() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | string>('All');
   
   const [newMaterial, setNewMaterial] = useState({
@@ -65,7 +67,11 @@ function MaterialsContent() {
     if (!newMaterial.projectId || !newMaterial.name || newMaterial.totalCost <= 0) return;
 
     try {
-      await addMaterial(newMaterial);
+      if (editingId) {
+        await updateMaterial(editingId, newMaterial);
+      } else {
+        await addMaterial(newMaterial);
+      }
       await loadData();
       setNewMaterial({
         ...newMaterial,
@@ -79,9 +85,29 @@ function MaterialsContent() {
         image: undefined
       });
       setShowForm(false);
+      setEditingId(null);
     } catch (err) {
       alert('Failed to save material entry');
     }
+  };
+
+  const handleEdit = (m: Material) => {
+    setNewMaterial({
+      projectId: m.projectId,
+      name: m.name,
+      vendor: m.vendor || '',
+      quantity: m.quantity,
+      unit: m.unit,
+      unitPrice: m.unitPrice,
+      totalCost: m.totalCost,
+      amountPaid: m.amountPaid || 0,
+      date: m.date,
+      notes: m.notes || '',
+      image: m.image
+    });
+    setEditingId(m.id);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {
@@ -117,16 +143,31 @@ function MaterialsContent() {
             ))}
           </div>
           {!showForm && (
-            <button className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }} onClick={() => setShowForm(true)}>
-              + Add Material
-            </button>
+            <>
+              <Link href="/materials/vendors" className="btn-secondary">
+                View Suppliers
+              </Link>
+              <button className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }} onClick={() => {
+                setEditingId(null);
+                setNewMaterial({
+                  projectId: projects.length > 0 ? projects[0].id : '',
+                  name: '', vendor: '', quantity: 1, unit: 'bags', unitPrice: 0, totalCost: 0, amountPaid: 0,
+                  date: new Date().toISOString().split('T')[0], notes: '', image: undefined
+                });
+                setShowForm(true);
+              }}>
+                + Add Material
+              </button>
+            </>
           )}
         </div>
       </header>
 
       {showForm && (
         <section className={`${styles.formSection} card`}>
-          <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>New Material Entry</h2>
+          <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>
+            {editingId ? 'Edit Material Entry' : 'New Material Entry'}
+          </h2>
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className={styles.formRow}>
               <div className={styles.inputGroup}>
@@ -245,8 +286,13 @@ function MaterialsContent() {
             </div>
             
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>Save Entry</button>
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="submit" className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>
+                {editingId ? 'Update Entry' : 'Save Entry'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={() => {
+                setShowForm(false);
+                setEditingId(null);
+              }}>Cancel</button>
             </div>
           </form>
         </section>
@@ -295,9 +341,12 @@ function MaterialsContent() {
                    </div>
                 </div>
 
-                <div className={styles.materialFooter} style={{ paddingTop: '0.5rem' }}>
+                <div className={styles.materialFooter} style={{ paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '0.5rem' }}>
                   <div className={styles.totalCost}>Total: ₹{m.totalCost}</div>
-                  <button onClick={() => handleDelete(m.id)} className={styles.deleteBtn}>×</button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button onClick={() => handleEdit(m)} className={styles.filterBtn} style={{ background: 'rgba(255,255,255,0.1)' }}>✏️</button>
+                    <button onClick={() => handleDelete(m.id)} className={styles.deleteBtn}>×</button>
+                  </div>
                 </div>
               </div>
             );

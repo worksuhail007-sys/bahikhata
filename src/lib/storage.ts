@@ -130,6 +130,24 @@ export const restoreWorker = async (workerId: string) => {
   if (error) throw error;
 };
 
+export const updateWorker = async (id: string, updates: Partial<Worker>) => {
+  const { data, error } = await supabase
+    .from('workers')
+    .update({
+      name: updates.name,
+      role: updates.role,
+      daily_rate: updates.dailyRate,
+      status: updates.status,
+      project_id: updates.projectId
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return { ...data, dailyRate: Number(data.daily_rate), projectId: data.project_id };
+};
+
 export const deleteWorkerWithHistory = async (workerId: string) => {
   // Cascading deletes handled by Postgres foreign keys (ON DELETE CASCADE)
   const { error } = await supabase.from('workers').delete().eq('id', workerId);
@@ -181,6 +199,26 @@ export const deleteAttendance = async (id: string) => {
   if (error) throw error;
 };
 
+export const updateAttendance = async (id: string, updates: Partial<Attendance>) => {
+  const { data, error } = await supabase
+    .from('attendance')
+    .update({
+      worker_id: updates.workerId,
+      project_id: updates.projectId,
+      date: updates.date,
+      status: updates.status,
+      overtime_amount: updates.overtimeAmount,
+      notes: updates.notes,
+      image_url: updates.image
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { ...data, workerId: data.worker_id, projectId: data.project_id, overtimeAmount: Number(data.overtime_amount), image: data.image_url };
+};
+
 // --- Payments ---
 export const getPayments = async (): Promise<Payment[]> => {
   const { data, error } = await supabase
@@ -221,6 +259,24 @@ export const addPayment = async (payment: Omit<Payment, 'id'>) => {
 export const deletePayment = async (id: string) => {
   const { error } = await supabase.from('payments').delete().eq('id', id);
   if (error) throw error;
+};
+
+export const updatePayment = async (id: string, updates: Partial<Payment>) => {
+  const { data, error } = await supabase
+    .from('payments')
+    .update({
+      worker_id: updates.workerId,
+      amount: updates.amount,
+      date: updates.date,
+      notes: updates.notes,
+      image_url: updates.image
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { ...data, workerId: data.worker_id, amount: Number(data.amount), image: data.image_url };
 };
 
 // --- Materials ---
@@ -278,6 +334,37 @@ export const addMaterial = async (material: Omit<Material, 'id'>) => {
 export const deleteMaterial = async (id: string) => {
   const { error } = await supabase.from('materials').delete().eq('id', id);
   if (error) throw error;
+};
+
+export const updateMaterial = async (id: string, updates: Partial<Material>) => {
+  const { data, error } = await supabase
+    .from('materials')
+    .update({
+      project_id: updates.projectId,
+      name: updates.name,
+      vendor: updates.vendor,
+      quantity: updates.quantity,
+      unit: updates.unit,
+      unit_price: updates.unitPrice,
+      total_cost: updates.totalCost,
+      amount_paid: updates.amountPaid,
+      date: updates.date,
+      notes: updates.notes,
+      image_url: updates.image
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { 
+    ...data, 
+    projectId: data.project_id, 
+    unitPrice: Number(data.unit_price), 
+    totalCost: Number(data.total_cost), 
+    amountPaid: Number(data.amount_paid),
+    image: data.image_url 
+  };
 };
 
 // --- Balance Calculations ---
