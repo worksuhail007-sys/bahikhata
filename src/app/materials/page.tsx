@@ -15,6 +15,7 @@ function MaterialsContent() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | string>('All');
+  const [isCustomMaterial, setIsCustomMaterial] = useState(false);
   
   const [newMaterial, setNewMaterial] = useState({
     projectId: '',
@@ -95,7 +96,16 @@ function MaterialsContent() {
     }
   };
 
+  const predefinedMaterials = [
+    'Cement', 'Sand', 'Aggregates (Gravel)', 'Steel / TMT Bars', 
+    'Bricks', 'Concrete Blocks', 'Wood / Timber', 'Paint & Primer', 
+    'Tiles / Marble', 'Plumbing Pipes', 'Electrical Wires', 
+    'Hardware / Fittings', 'Glass', 'Other'
+  ];
+
   const handleEdit = (m: Material) => {
+    const isCustom = !predefinedMaterials.includes(m.name);
+    setIsCustomMaterial(isCustom);
     setNewMaterial({
       projectId: m.projectId,
       vendorId: m.vendorId || '',
@@ -153,6 +163,7 @@ function MaterialsContent() {
               </Link>
               <button className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }} onClick={() => {
                 setEditingId(null);
+                setIsCustomMaterial(false);
                 setNewMaterial({
                   projectId: projects.length > 0 ? projects[0].id : '',
                   vendorId: vendors.length > 0 ? vendors[0].id : '',
@@ -201,13 +212,39 @@ function MaterialsContent() {
             <div className={styles.formRow}>
               <div className={styles.inputGroup}>
                 <label>Material Name</label>
-                <input 
-                  type="text" 
-                  value={newMaterial.name} 
-                  onChange={e => setNewMaterial({...newMaterial, name: e.target.value})}
-                  placeholder="e.g., Cement, Steel, Sand"
-                  required
-                />
+                {isCustomMaterial ? (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input 
+                      type="text" 
+                      value={newMaterial.name} 
+                      onChange={e => setNewMaterial({...newMaterial, name: e.target.value})}
+                      placeholder="Type custom material name"
+                      required
+                      autoFocus
+                    />
+                    <button type="button" onClick={() => { setIsCustomMaterial(false); setNewMaterial({...newMaterial, name: ''}); }} className="btn-secondary" style={{ padding: '0.75rem' }}>
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={predefinedMaterials.includes(newMaterial.name) ? newMaterial.name : (newMaterial.name ? 'Other' : '')}
+                    onChange={e => {
+                      if (e.target.value === 'Other') {
+                        setIsCustomMaterial(true);
+                        setNewMaterial({...newMaterial, name: ''});
+                      } else {
+                        setNewMaterial({...newMaterial, name: e.target.value});
+                      }
+                    }}
+                    required
+                  >
+                    <option value="" disabled>Select material type</option>
+                    {predefinedMaterials.map(mat => (
+                      <option key={mat} value={mat}>{mat}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className={styles.inputGroup}>
                 <label>Vendor / Supplier</label>
@@ -266,11 +303,14 @@ function MaterialsContent() {
             </div>
 
             <div className={styles.formRow}>
-              <div className={styles.inputGroup} style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.1)', justifyContent: 'center' }}>
-                <label style={{ color: '#f59e0b', marginBottom: '0.25rem' }}>Total Bill Amount</label>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>
-                  ₹{newMaterial.totalCost}
-                </div>
+              <div className={styles.inputGroup}>
+                <label>Total Bill Amount (Auto-calculated)</label>
+                <input 
+                  type="text" 
+                  value={`₹${newMaterial.totalCost}`} 
+                  readOnly
+                  style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontWeight: 'bold', border: '1px solid rgba(245, 158, 11, 0.2)' }}
+                />
               </div>
               <div className={styles.inputGroup}>
                 <label>Amount Paid Now (₹)</label>
@@ -279,7 +319,6 @@ function MaterialsContent() {
                   value={newMaterial.amountPaid || ''} 
                   onChange={e => setNewMaterial({...newMaterial, amountPaid: Number(e.target.value)})}
                   placeholder="How much paid to vendor?"
-                  style={{ height: '100%' }}
                 />
               </div>
             </div>
