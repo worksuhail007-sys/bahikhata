@@ -60,6 +60,14 @@ export interface Vendor {
   createdAt?: string;
 }
 
+export interface VendorPayment {
+  id: string;
+  vendorId: string;
+  amount: number;
+  date: string;
+  notes?: string;
+}
+
 // --- Projects ---
 export const getProjects = async (): Promise<Project[]> => {
   const { data, error } = await supabase.from('projects').select('*').order('name');
@@ -301,6 +309,44 @@ export const addVendor = async (vendor: Omit<Vendor, 'id'>) => {
   const { data, error } = await supabase.from('vendors').insert([vendor]).select().single();
   if (error) throw error;
   return data;
+};
+
+export const getVendorPayments = async (): Promise<VendorPayment[]> => {
+  const { data, error } = await supabase.from('vendor_payments').select('*').order('date', { ascending: false });
+  if (error) {
+    console.error('Error fetching vendor payments:', error);
+    return [];
+  }
+  return (data || []).map(vp => ({
+    id: vp.id,
+    vendorId: vp.vendor_id,
+    amount: Number(vp.amount),
+    date: vp.date,
+    notes: vp.notes
+  }));
+};
+
+export const addVendorPayment = async (payment: Omit<VendorPayment, 'id'>) => {
+  const { data, error } = await supabase.from('vendor_payments').insert([{
+    vendor_id: payment.vendorId,
+    amount: payment.amount,
+    date: payment.date,
+    notes: payment.notes
+  }]).select().single();
+  
+  if (error) throw error;
+  return {
+    id: data.id,
+    vendorId: data.vendor_id,
+    amount: Number(data.amount),
+    date: data.date,
+    notes: data.notes
+  };
+};
+
+export const deleteVendorPayment = async (id: string) => {
+  const { error } = await supabase.from('vendor_payments').delete().eq('id', id);
+  if (error) throw error;
 };
 
 // --- Materials ---

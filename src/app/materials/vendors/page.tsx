@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import styles from './vendors.module.css';
-import { getMaterials, Material, getVendors, Vendor, addVendor } from '@/lib/storage';
+import { getMaterials, Material, getVendors, Vendor, addVendor, getVendorPayments, VendorPayment } from '@/lib/storage';
 
 export default function VendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   
@@ -19,9 +20,10 @@ export default function VendorsPage() {
 
   const loadData = async () => {
     try {
-      const [v, m] = await Promise.all([getVendors(), getMaterials()]);
+      const [v, m, vp] = await Promise.all([getVendors(), getMaterials(), getVendorPayments()]);
       setVendors(v);
       setMaterials(m);
+      setVendorPayments(vp);
     } catch (err) {
       console.error('Error loading vendors:', err);
     } finally {
@@ -50,13 +52,26 @@ export default function VendorsPage() {
 
   const getVendorStats = (vendorId: string) => {
     const vendorBills = materials.filter(m => m.vendorId === vendorId);
-    return vendorBills.reduce((acc, curr) => ({
+    const vendorLumpSums = vendorPayments.filter(vp => vp.vendorId === vendorId);
+
+    const billStats = vendorBills.reduce((acc, curr) => ({
       totalBilled: acc.totalBilled + curr.totalCost,
-      totalPaid: acc.totalPaid + curr.amountPaid,
-      balance: acc.balance + (curr.totalCost - curr.amountPaid),
+      totalPaidOnBills: acc.totalPaidOnBills + curr.amountPaid,
       itemCount: acc.itemCount + 1,
       lastPurchase: curr.date > acc.lastPurchase ? curr.date : acc.lastPurchase
-    }), { totalBilled: 0, totalPaid: 0, balance: 0, itemCount: 0, lastPurchase: '' });
+    }), { totalBilled: 0, totalPaidOnBills: 0, itemCount: 0, lastPurchase: '' });
+
+    const totalLumpSumPaid = vendorLumpSums.reduce((sum, vp) => sum + vp.amount, 0);
+    const grandTotalPaid = billStats.totalPaidOnBills + totalLumpSumPaid;
+    const balance = billStats.totalBilled - grandTotalPaid;
+
+    return {
+      totalBilled: billStats.totalBilled,
+      totalPaid: grandTotalPaid,
+      balance: balance,
+      itemCount: billStats.itemCount,
+      lastPurchase: billStats.lastPurchase
+    };
   };
 
   if (loading) return <div className="container" style={{ paddingTop: '5rem' }}><p>Loading supplier list...</p></div>;
