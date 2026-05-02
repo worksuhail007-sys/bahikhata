@@ -17,6 +17,7 @@ export default function Home() {
   const [todayLogs, setTodayLogs] = useState<Attendance[]>([]);
   const [totalBalance, setTotalBalance] = useState(0);
   const [totalMaterialCost, setTotalMaterialCost] = useState(0);
+  const [totalMaterialPaid, setTotalMaterialPaid] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,9 +51,11 @@ export default function Home() {
         const totalBal = balances.reduce((sum, b) => sum + b.balance, 0);
         setTotalBalance(totalBal);
         
-        // Calculate Total Material Cost
-        const totalMat = m.reduce((sum, mat) => sum + mat.totalCost, 0);
-        setTotalMaterialCost(totalMat);
+        // Calculate Total Material Cost & Paid
+        const totalMatCost = m.reduce((sum, mat) => sum + mat.totalCost, 0);
+        const totalMatPaid = m.reduce((sum, mat) => sum + mat.amountPaid, 0);
+        setTotalMaterialCost(totalMatCost);
+        setTotalMaterialPaid(totalMatPaid);
 
       } catch (err) {
         console.error('Failed to load dashboard:', err);
@@ -75,7 +78,16 @@ export default function Home() {
     );
   }
 
-  const grandTotalCost = totalBalance + totalMaterialCost;
+  const matBalance = totalMaterialCost - totalMaterialPaid;
+  const grandTotalCost = totalMaterialCost + (attendance.reduce((sum, a) => {
+      // Crude estimation of total earned for active workers since start
+      // This is simplified for dashboard display
+      const w = workers.find(work => work.id === a.workerId);
+      if(!w) return sum;
+      return sum + (a.status === 'Half' ? w.dailyRate/2 : w.dailyRate) + (a.overtimeAmount || 0);
+  }, 0));
+  
+  const grandTotalDue = totalBalance + matBalance;
 
   return (
     <div className={`${styles.container} container fade-in`}>
@@ -98,14 +110,14 @@ export default function Home() {
           <p className={styles.statSub}>Across {projects.length} sites</p>
         </div>
         <div className="card">
-          <p className={styles.statLabel}>Total Project Cost</p>
-          <h3 className={`${styles.statValue} ${styles.due}`}>₹{grandTotalCost}</h3>
-          <p className={styles.statSub}>Materials (₹{totalMaterialCost}) + Labour Due (₹{totalBalance})</p>
+          <p className={styles.statLabel}>Total Balance Due</p>
+          <h3 className={`${styles.statValue} ${grandTotalDue > 0 ? styles.due : ''}`}>₹{grandTotalDue}</h3>
+          <p className={styles.statSub}>Labour (₹{totalBalance}) + Materials (₹{matBalance})</p>
         </div>
         <div className="card">
-          <p className={styles.statLabel}>Total Balance Due</p>
-          <h3 className={`${styles.statValue} ${totalBalance > 0 ? styles.due : ''}`}>₹{totalBalance}</h3>
-          <p className={styles.statSub}>Pending across all sites</p>
+          <p className={styles.statLabel}>Material Payments</p>
+          <h3 className={styles.statValue} style={{ color: '#10b981' }}>₹{totalMaterialPaid}</h3>
+          <p className={styles.statSub}>Paid out of ₹{totalMaterialCost}</p>
         </div>
       </div>
 
@@ -138,7 +150,7 @@ export default function Home() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.subTitle}>Recent Material Purchases</h2>
+          <h2 className={styles.subTitle}>Material Bill Status</h2>
           <div className={styles.activityList}>
             {materials.length === 0 ? (
               <div className={`${styles.empty} glass`}>
@@ -147,13 +159,19 @@ export default function Home() {
             ) : (
               materials.slice(0, 6).map((m) => {
                 const project = projects.find(p => p.id === m.projectId);
+                const bal = m.totalCost - m.amountPaid;
                 return (
                   <div key={m.id} className={`${styles.activityItem} glass`}>
                     <div className={styles.activityInfo}>
                       <p className={styles.activityWorker}>{m.name}</p>
                       <p className={styles.activityMeta}>{new Date(m.date).toLocaleDateString()} • {project?.name || 'Site'}</p>
                     </div>
-                    <p className={styles.paymentVal}>₹{m.totalCost}</p>
+                    <div style={{ textAlign: 'right' }}>
+                       <p className={styles.paymentVal} style={{ color: bal > 0 ? '#ef4444' : '#10b981' }}>
+                         {bal > 0 ? `Due: ₹${bal}` : 'Fully Paid'}
+                       </p>
+                       <p style={{ fontSize: '0.7rem', color: '#666' }}>Total: ₹{m.totalCost}</p>
+                    </div>
                   </div>
                 );
               })
@@ -169,14 +187,18 @@ export default function Home() {
             {projects.map(proj => {
               const siteWorkers = workers.filter(w => w.projectId === proj.id);
               const siteMaterials = materials.filter(m => m.projectId === proj.id);
-              const siteMaterialCost = siteMaterials.reduce((sum, m) => sum + m.totalCost, 0);
+              const siteMatCost = siteMaterials.reduce((sum, m) => sum + m.totalCost, 0);
+              const siteMatPaid = siteMaterials.reduce((sum, m) => sum + m.amountPaid, 0);
+              const siteMatDue = siteMatCost - siteMatPaid;
               
               return (
                 <div key={proj.id} className="card">
                   <h4 style={{ color: 'var(--primary)', marginBottom: '0.5rem' }}>{proj.name}</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem' }}>
-                     <span>{siteWorkers.length} Workers</span>
-                     <span>Material Cost: ₹{siteMaterialCost}</span>
+                     <span>{siteWorkers.length} Workers Active</span>
+                     <span style={{ color: siteMatDue > 0 ? '#ef4444' : '#10b981' }}>
+                        Material Due: ₹{siteMatDue}
+                     </span>
                   </div>
                 </div>
               );

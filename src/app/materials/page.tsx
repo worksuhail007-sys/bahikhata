@@ -21,6 +21,7 @@ function MaterialsContent() {
     unit: 'bags',
     unitPrice: 0,
     totalCost: 0,
+    amountPaid: 0,
     date: new Date().toISOString().split('T')[0],
     notes: '',
     image: undefined as string | undefined
@@ -73,6 +74,7 @@ function MaterialsContent() {
         quantity: 1,
         unitPrice: 0,
         totalCost: 0,
+        amountPaid: 0,
         notes: '',
         image: undefined
       });
@@ -210,10 +212,21 @@ function MaterialsContent() {
               </div>
             </div>
 
-            <div className={styles.inputGroup} style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-              <label style={{ color: '#f59e0b' }}>Total Cost (Auto-calculated)</label>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>
-                ₹{newMaterial.totalCost}
+            <div className={styles.formRow}>
+              <div className={styles.inputGroup} style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.1)' }}>
+                <label style={{ color: '#f59e0b' }}>Total Bill Amount</label>
+                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>
+                  ₹{newMaterial.totalCost}
+                </div>
+              </div>
+              <div className={styles.inputGroup}>
+                <label>Amount Paid Now (₹)</label>
+                <input 
+                  type="number" 
+                  value={newMaterial.amountPaid || ''} 
+                  onChange={e => setNewMaterial({...newMaterial, amountPaid: Number(e.target.value)})}
+                  placeholder="How much paid to vendor?"
+                />
               </div>
             </div>
 
@@ -232,7 +245,7 @@ function MaterialsContent() {
             </div>
             
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>Save Material</button>
+              <button type="submit" className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>Save Entry</button>
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
             </div>
           </form>
@@ -247,6 +260,7 @@ function MaterialsContent() {
         ) : (
           filteredMaterials.map(m => {
             const project = projects.find(p => p.id === m.projectId);
+            const balance = m.totalCost - m.amountPaid;
             return (
               <div key={m.id} className={styles.materialItem}>
                 <div className={styles.materialHeader}>
@@ -268,8 +282,21 @@ function MaterialsContent() {
                   </div>
                 </div>
 
-                <div className={styles.materialFooter}>
-                  <div className={styles.totalCost}>₹{m.totalCost}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                   <div className={styles.detailItem}>
+                      <span className={styles.detailLabel}>Paid</span>
+                      <span className={styles.detailValue} style={{ color: '#10b981' }}>₹{m.amountPaid}</span>
+                   </div>
+                   <div className={styles.detailItem} style={{ textAlign: 'right' }}>
+                      <span className={styles.detailLabel}>Pending</span>
+                      <span className={styles.detailValue} style={{ color: balance > 0 ? '#ef4444' : '#10b981' }}>
+                        ₹{balance}
+                      </span>
+                   </div>
+                </div>
+
+                <div className={styles.materialFooter} style={{ paddingTop: '0.5rem' }}>
+                  <div className={styles.totalCost}>Total: ₹{m.totalCost}</div>
                   <button onClick={() => handleDelete(m.id)} className={styles.deleteBtn}>×</button>
                 </div>
               </div>

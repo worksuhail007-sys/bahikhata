@@ -46,6 +46,7 @@ export interface Material {
   unit: string;
   unitPrice: number;
   totalCost: number;
+  amountPaid: number;
   date: string;
   notes?: string;
   image?: string;
@@ -239,6 +240,7 @@ export const getMaterials = async (): Promise<Material[]> => {
     projectId: m.project_id,
     unitPrice: Number(m.unit_price),
     totalCost: Number(m.total_cost),
+    amountPaid: Number(m.amount_paid),
     image: m.image_url
   }));
 };
@@ -254,6 +256,7 @@ export const addMaterial = async (material: Omit<Material, 'id'>) => {
       unit: material.unit,
       unit_price: material.unitPrice,
       total_cost: material.totalCost,
+      amount_paid: material.amountPaid,
       date: material.date,
       notes: material.notes,
       image_url: material.image
@@ -267,6 +270,7 @@ export const addMaterial = async (material: Omit<Material, 'id'>) => {
     projectId: data.project_id, 
     unitPrice: Number(data.unit_price), 
     totalCost: Number(data.total_cost), 
+    amountPaid: Number(data.amount_paid),
     image: data.image_url 
   };
 };
