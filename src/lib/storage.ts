@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 export type AttendanceStatus = 'Full' | 'Half';
 
 export interface Project {
@@ -12,15 +14,15 @@ export interface Worker {
   role: string;
   dailyRate: number;
   status?: 'active' | 'archived';
-  projectId?: string; // Linked project
+  projectId?: string;
 }
 
 export interface Attendance {
   id: string;
   workerId: string;
   date: string;
-  projectId: string; // Linked project ID
-  status: 'Full' | 'Half';
+  projectId: string;
+  status: AttendanceStatus;
   overtimeAmount: number;
   notes?: string;
   image?: string;
@@ -35,163 +37,223 @@ export interface Payment {
   image?: string;
 }
 
-const STORAGE_KEYS = {
-  PROJECTS: 'bahikhata_projects',
-  WORKERS: 'bahikhata_workers',
-  ATTENDANCE: 'bahikhata_attendance',
-  PAYMENTS: 'bahikhata_payments',
-};
-
 // --- Projects ---
-export const getProjects = (): Project[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-  if (!stored) {
-    // Default initial projects
-    const defaults = [
-      { id: 'p1', name: 'Home' },
-      { id: 'p2', name: 'Shop' }
-    ];
-    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(defaults));
-    return defaults;
+export const getProjects = async (): Promise<Project[]> => {
+  const { data, error } = await supabase.from('projects').select('*').order('name');
+  if (error) {
+    console.error('Error fetching projects:', error);
+    return [];
   }
-  return JSON.parse(stored);
+  return data || [];
 };
 
-export const addProject = (name: string, description?: string) => {
-  const projects = getProjects();
-  const newProject = { id: crypto.randomUUID(), name, description };
-  localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify([...projects, newProject]));
-  return newProject;
+export const addProject = async (name: string, description?: string) => {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert([{ name, description }])
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
 };
 
-export const deleteProject = (id: string) => {
-  const projects = getProjects().filter(p => p.id !== id);
-  localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+export const deleteProject = async (id: string) => {
+  const { error } = await supabase.from('projects').delete().eq('id', id);
+  if (error) throw error;
 };
 
 // --- Workers ---
-export const getWorkers = (): Worker[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(STORAGE_KEYS.WORKERS);
-  const data = stored ? JSON.parse(stored) : [];
-  return data.map((w: any) => ({
+export const getWorkers = async (): Promise<Worker[]> => {
+  const { data, error } = await supabase
+    .from('workers')
+    .select('*')
+    .order('name');
+  
+  if (error) {
+    console.error('Error fetching workers:', error);
+    return [];
+  }
+
+  return (data || []).map(w => ({
     ...w,
-    status: w.status || 'active',
-    projectId: w.projectId || 'p1' // Default to Home if not set
+    dailyRate: Number(w.daily_rate),
+    projectId: w.project_id
   }));
 };
 
-export const saveWorkers = (workers: Worker[]) => {
-  localStorage.setItem(STORAGE_KEYS.WORKERS, JSON.stringify(workers));
+export const addWorker = async (worker: Omit<Worker, 'id'>) => {
+  const { data, error } = await supabase
+    .from('workers')
+    .insert([{
+      name: worker.name,
+      role: worker.role,
+      daily_rate: worker.dailyRate,
+      status: worker.status || 'active',
+      project_id: worker.projectId
+    }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { ...data, dailyRate: Number(data.daily_rate), projectId: data.project_id };
 };
 
-export const addWorker = (worker: Omit<Worker, 'id'>) => {
-  const workers = getWorkers();
-  const newWorker = { ...worker, id: crypto.randomUUID() };
-  saveWorkers([...workers, newWorker]);
-  return newWorker;
+export const archiveWorker = async (workerId: string) => {
+  const { error } = await supabase
+    .from('workers')
+    .update({ status: 'archived' })
+    .eq('id', workerId);
+  if (error) throw error;
 };
 
-export const archiveWorker = (workerId: string) => {
-  const workers = getWorkers().map(w => 
-    w.id === workerId ? { ...w, status: 'archived' as const } : w
-  );
-  saveWorkers(workers);
+export const restoreWorker = async (workerId: string) => {
+  const { error } = await supabase
+    .from('workers')
+    .update({ status: 'active' })
+    .eq('id', workerId);
+  if (error) throw error;
 };
 
-export const restoreWorker = (workerId: string) => {
-  const workers = getWorkers().map(w => 
-    w.id === workerId ? { ...w, status: 'active' as const } : w
-  );
-  saveWorkers(workers);
-};
-
-export const deleteWorkerWithHistory = (workerId: string) => {
-  const workers = getWorkers().filter(w => w.id !== workerId);
-  const attendance = getAttendance().filter(a => a.workerId !== workerId);
-  const payments = getPayments().filter(p => p.workerId !== workerId);
-  
-  saveWorkers(workers);
-  saveAttendance(attendance);
-  savePayments(payments);
+export const deleteWorkerWithHistory = async (workerId: string) => {
+  // Cascading deletes handled by Postgres foreign keys (ON DELETE CASCADE)
+  const { error } = await supabase.from('workers').delete().eq('id', workerId);
+  if (error) throw error;
 };
 
 // --- Attendance ---
-export const getAttendance = (): Attendance[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
-  const data = stored ? JSON.parse(stored) : [];
-  return data.map((a: any) => ({
+export const getAttendance = async (): Promise<Attendance[]> => {
+  const { data, error } = await supabase
+    .from('attendance')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching attendance:', error);
+    return [];
+  }
+
+  return (data || []).map(a => ({
     ...a,
-    status: a.status || 'Full',
-    overtimeAmount: a.overtimeAmount || 0,
-    projectId: a.projectId || a.project || 'p1' // Migration for old 'project' string
+    workerId: a.worker_id,
+    projectId: a.project_id,
+    overtimeAmount: Number(a.overtime_amount),
+    image: a.image_url
   }));
 };
 
-export const saveAttendance = (attendance: Attendance[]) => {
-  localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendance));
+export const logAttendance = async (entry: Omit<Attendance, 'id'>) => {
+  const { data, error } = await supabase
+    .from('attendance')
+    .insert([{
+      worker_id: entry.workerId,
+      project_id: entry.projectId,
+      date: entry.date,
+      status: entry.status,
+      overtime_amount: entry.overtimeAmount,
+      notes: entry.notes,
+      image_url: entry.image
+    }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { ...data, workerId: data.worker_id, projectId: data.project_id, overtimeAmount: Number(data.overtime_amount), image: data.image_url };
 };
 
-export const logAttendance = (entry: Omit<Attendance, 'id'>) => {
-  const attendance = getAttendance();
-  const newEntry = { ...entry, id: crypto.randomUUID() };
-  saveAttendance([...attendance, newEntry]);
-  return newEntry;
+export const deleteAttendance = async (id: string) => {
+  const { error } = await supabase.from('attendance').delete().eq('id', id);
+  if (error) throw error;
 };
 
 // --- Payments ---
-export const getPayments = (): Payment[] => {
-  if (typeof window === 'undefined') return [];
-  const stored = localStorage.getItem(STORAGE_KEYS.PAYMENTS);
-  return stored ? JSON.parse(stored) : [];
+export const getPayments = async (): Promise<Payment[]> => {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching payments:', error);
+    return [];
+  }
+
+  return (data || []).map(p => ({
+    ...p,
+    workerId: p.worker_id,
+    amount: Number(p.amount),
+    image: p.image_url
+  }));
 };
 
-export const savePayments = (payments: Payment[]) => {
-  localStorage.setItem(STORAGE_KEYS.PAYMENTS, JSON.stringify(payments));
+export const addPayment = async (payment: Omit<Payment, 'id'>) => {
+  const { data, error } = await supabase
+    .from('payments')
+    .insert([{
+      worker_id: payment.workerId,
+      amount: payment.amount,
+      date: payment.date,
+      notes: payment.notes,
+      image_url: payment.image
+    }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return { ...data, workerId: data.worker_id, amount: Number(data.amount), image: data.image_url };
 };
 
-export const addPayment = (payment: Omit<Payment, 'id'>) => {
-  const payments = getPayments();
-  const newPayment = { ...payment, id: crypto.randomUUID() };
-  savePayments([...payments, newPayment]);
-  return newPayment;
+export const deletePayment = async (id: string) => {
+  const { error } = await supabase.from('payments').delete().eq('id', id);
+  if (error) throw error;
 };
 
 // --- Balance Calculations ---
-export const getWorkerBalance = (workerId: string) => {
-  const worker = getWorkers().find(w => w.id === workerId);
-  const attendance = getAttendance().filter(a => a.workerId === workerId);
-  const payments = getPayments().filter(p => p.workerId === workerId);
+export const getWorkerBalance = async (workerId: string) => {
+  const { data: worker } = await supabase.from('workers').select('*').eq('id', workerId).single();
+  const { data: attendance } = await supabase.from('attendance').select('*').eq('worker_id', workerId);
+  const { data: payments } = await supabase.from('payments').select('*').eq('worker_id', workerId);
 
   if (!worker) return { earned: 0, paid: 0, balance: 0, daysWorked: 0 };
 
-  const earned = attendance.reduce((sum, a) => {
-    const dayValue = a.status === 'Half' ? worker.dailyRate / 2 : worker.dailyRate;
-    return sum + dayValue + (a.overtimeAmount || 0);
+  const dailyRate = Number(worker.daily_rate);
+  const earned = (attendance || []).reduce((sum, a) => {
+    const dayValue = a.status === 'Half' ? dailyRate / 2 : dailyRate;
+    return sum + dayValue + Number(a.overtime_amount || 0);
   }, 0);
 
-  const paid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const paid = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
   
   return {
     earned,
     paid,
     balance: earned - paid,
-    daysWorked: attendance.reduce((sum, a) => sum + (a.status === 'Half' ? 0.5 : 1), 0)
+    daysWorked: (attendance || []).reduce((sum, a) => sum + (a.status === 'Half' ? 0.5 : 1), 0)
   };
 };
 
-export const getWorkerLedger = (workerId: string) => {
-  const attendance = getAttendance()
-    .filter(a => a.workerId === workerId)
-    .map(a => ({ ...a, type: 'attendance' as const }));
-  
-  const payments = getPayments()
-    .filter(p => p.workerId === workerId)
-    .map(p => ({ ...p, type: 'payment' as const }));
+export const getWorkerLedger = async (workerId: string) => {
+  const { data: attendance } = await supabase.from('attendance').select('*').eq('worker_id', workerId);
+  const { data: payments } = await supabase.from('payments').select('*').eq('worker_id', workerId);
 
-  return [...attendance, ...payments].sort((a, b) => 
+  const aLogs = (attendance || []).map(a => ({
+    ...a,
+    workerId: a.worker_id,
+    projectId: a.project_id,
+    overtimeAmount: Number(a.overtime_amount),
+    image: a.image_url,
+    type: 'attendance' as const
+  }));
+
+  const pLogs = (payments || []).map(p => ({
+    ...p,
+    workerId: p.worker_id,
+    amount: Number(p.amount),
+    image: p.image_url,
+    type: 'payment' as const
+  }));
+
+  return [...aLogs, ...pLogs].sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 };

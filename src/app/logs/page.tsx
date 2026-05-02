@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './logs.module.css';
 import { 
-  getWorkers, getAttendance, logAttendance, saveAttendance, Worker, 
+  getWorkers, getAttendance, logAttendance, deleteAttendance, Worker, 
   Attendance, Project, getProjects, AttendanceStatus 
 } from '@/lib/storage';
 import ImageUpload from '@/components/ImageUpload';
@@ -13,6 +13,7 @@ function LogsContent() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [logs, setLogs] = useState<Attendance[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<'All' | string>('All');
   const [startDate, setStartDate] = useState('');
@@ -31,22 +32,30 @@ function LogsContent() {
 
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    const p = getProjects();
-    setProjects(p);
-    setWorkers(getWorkers());
-    setLogs(getAttendance());
-    
-    if (p.length > 0) {
-      setNewLog(prev => ({ ...prev, projectId: p[0].id }));
+  const loadData = async () => {
+    try {
+      const [p, w, a] = await Promise.all([getProjects(), getWorkers(), getAttendance()]);
+      setProjects(p);
+      setWorkers(w);
+      setLogs(a);
+      
+      if (p.length > 0 && !newLog.projectId) {
+        setNewLog(prev => ({ ...prev, projectId: p[0].id }));
+      }
+    } catch (err) {
+      console.error('Error loading logs:', err);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
+    loadData();
     if (searchParams.get('action') === 'new') {
       setShowForm(true);
     }
   }, [searchParams]);
 
-  // Update project ID when worker changes to their default
   const handleWorkerChange = (id: string) => {
     const worker = workers.find(w => w.id === id);
     setNewLog(prev => ({ 
@@ -56,21 +65,24 @@ function LogsContent() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLog.workerId || !newLog.projectId) return;
 
-    const added = logAttendance(newLog);
-    setLogs([...logs, added]);
-    setNewLog({ ...newLog, workerId: '', notes: '', image: undefined, overtimeAmount: 0, status: 'Full' });
-    setShowForm(false);
+    try {
+      await logAttendance(newLog);
+      await loadData();
+      setNewLog({ ...newLog, workerId: '', notes: '', image: undefined, overtimeAmount: 0, status: 'Full' });
+      setShowForm(false);
+    } catch (err) {
+      alert('Failed to save log');
+    }
   };
 
-  const deleteLog = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Delete this attendance record?')) {
-      const updated = logs.filter(l => l.id !== id);
-      setLogs(updated);
-      saveAttendance(updated);
+      await deleteAttendance(id);
+      await loadData();
     }
   };
 
@@ -88,6 +100,10 @@ function LogsContent() {
 
   const activeWorkers = workers.filter(w => w.status === 'active');
 
+  if (loading && logs.length === 0) {
+    return <div className="container" style={{ paddingTop: '5rem', textAlign: 'center' }}><p>Loading logs...</p></div>;
+  }
+
   return (
     <div className="container fade-in" style={{ paddingTop: '3rem', paddingBottom: '5rem' }}>
       <header className={styles.header}>
@@ -99,7 +115,7 @@ function LogsContent() {
               checked={showArchived} 
               onChange={e => setShowArchived(e.target.checked)} 
             />
-            Show past worker history
+            Show history of past workers
           </label>
         </div>
         <div className={styles.headerActions}>
@@ -225,7 +241,7 @@ function LogsContent() {
           </div>
         ) : (
           <div className={styles.logList}>
-            {filteredLogs.slice().reverse().map(log => {
+            {filteredLogs.map(log => {
               const worker = workers.find(w => w.id === log.workerId);
               const project = projects.find(p => p.id === log.projectId);
               return (
@@ -256,7 +272,7 @@ function LogsContent() {
                     <span className={styles.badge}>
                       {project?.name || 'Unknown Site'}
                     </span>
-                    <button onClick={() => deleteLog(log.id)} className={styles.deleteBtn}>×</button>
+                    <button onClick={() => handleDelete(log.id)} className={styles.deleteBtn}>×</button>
                   </div>
                 </div>
               );

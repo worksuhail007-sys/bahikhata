@@ -3,12 +3,13 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './payments.module.css';
-import { getWorkers, getPayments, addPayment, savePayments, Worker, Payment } from '@/lib/storage';
+import { getWorkers, getPayments, addPayment, deletePayment, Worker, Payment } from '@/lib/storage';
 import ImageUpload from '@/components/ImageUpload';
 
 function PaymentsContent() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   
@@ -22,29 +23,43 @@ function PaymentsContent() {
 
   const searchParams = useSearchParams();
 
+  const loadData = async () => {
+    try {
+      const [w, p] = await Promise.all([getWorkers(), getPayments()]);
+      setWorkers(w);
+      setPayments(p);
+    } catch (err) {
+      console.error('Error loading payments:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setWorkers(getWorkers());
-    setPayments(getPayments());
+    loadData();
     if (searchParams.get('action') === 'new') {
       setShowForm(true);
     }
   }, [searchParams]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPayment.workerId || !newPayment.amount) return;
 
-    const added = addPayment(newPayment);
-    setPayments([...payments, added]);
-    setNewPayment({ ...newPayment, workerId: '', amount: 0, notes: '', image: undefined });
-    setShowForm(false);
+    try {
+      await addPayment(newPayment);
+      await loadData();
+      setNewPayment({ ...newPayment, workerId: '', amount: 0, notes: '', image: undefined });
+      setShowForm(false);
+    } catch (err) {
+      alert('Failed to save payment');
+    }
   };
 
-  const deletePayment = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Delete this payment record?')) {
-      const updated = payments.filter(p => p.id !== id);
-      setPayments(updated);
-      savePayments(updated);
+      await deletePayment(id);
+      await loadData();
     }
   };
 
@@ -55,6 +70,10 @@ function PaymentsContent() {
   });
 
   const activeWorkers = workers.filter(w => w.status === 'active');
+
+  if (loading && payments.length === 0) {
+    return <div className="container" style={{ paddingTop: '5rem', textAlign: 'center' }}><p>Loading payments...</p></div>;
+  }
 
   return (
     <div className="container fade-in" style={{ paddingTop: '3rem', paddingBottom: '5rem' }}>
@@ -139,10 +158,10 @@ function PaymentsContent() {
       <div className={styles.paymentList}>
         {filteredPayments.length === 0 ? (
           <div className="glass" style={{ padding: '4rem', textAlign: 'center' }}>
-            <p style={{ color: '#666' }}>No {showArchived ? 'history' : 'active payments'} recorded yet.</p>
+            <p style={{ color: '#666' }}>No records found.</p>
           </div>
         ) : (
-          filteredPayments.slice().reverse().map(payment => {
+          filteredPayments.map(payment => {
             const worker = workers.find(w => w.id === payment.workerId);
             return (
               <div key={payment.id} className={`${styles.paymentItem} glass`}>
@@ -159,7 +178,7 @@ function PaymentsContent() {
                 <div className={styles.paymentAmount}>
                   <span className={styles.currency}>₹</span>
                   <span className={styles.value}>{payment.amount}</span>
-                  <button onClick={() => deletePayment(payment.id)} className={styles.deleteBtn}>×</button>
+                  <button onClick={() => handleDelete(payment.id)} className={styles.deleteBtn}>×</button>
                 </div>
               </div>
             );

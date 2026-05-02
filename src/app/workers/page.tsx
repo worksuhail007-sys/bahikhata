@@ -12,6 +12,8 @@ import {
 function WorkersContent() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [balances, setBalances] = useState<Record<string, { earned: number; paid: number; balance: number }>>({});
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
@@ -21,49 +23,81 @@ function WorkersContent() {
 
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    const p = getProjects();
-    setProjects(p);
-    setWorkers(getWorkers());
-    
-    if (p.length > 0) {
-      setNewWorker(prev => ({ ...prev, projectId: p[0].id }));
-    }
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [p, w] = await Promise.all([getProjects(), getWorkers()]);
+      setProjects(p);
+      setWorkers(w);
+      
+      if (p.length > 0 && !newWorker.projectId) {
+        setNewWorker(prev => ({ ...prev, projectId: p[0].id }));
+      }
 
+      // Load balances in parallel
+      const balanceResults = await Promise.all(
+        w.map(async (worker) => {
+          const bal = await getWorkerBalance(worker.id);
+          return { id: worker.id, bal };
+        })
+      );
+      
+      const balanceMap: Record<string, { earned: number; paid: number; balance: number }> = {};
+      balanceResults.forEach(res => {
+        balanceMap[res.id] = res.bal;
+      });
+      setBalances(balanceMap);
+    } catch (err) {
+      console.error('Error loading workers data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
     if (searchParams.get('action') === 'new') {
       setShowForm(true);
     }
   }, [searchParams]);
 
-  const handleWorkerSubmit = (e: React.FormEvent) => {
+  const handleWorkerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newWorker.name || !newWorker.role || !newWorker.projectId) return;
     
-    const added = addWorker({ ...newWorker, status: 'active' });
-    setWorkers([...workers, added]);
-    setNewWorker({ ...newWorker, name: '', role: '', dailyRate: 0 });
-    setShowForm(false);
-  };
-
-  const handleProjectSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProject.name) return;
-    const added = addProject(newProject.name, newProject.description);
-    setProjects([...projects, added]);
-    setNewProject({ name: '', description: '' });
-    setShowProjectForm(false);
-  };
-
-  const handleArchive = (id: string) => {
-    if (confirm('Archive this worker? They will be moved to the "Past Workers" list.')) {
-      archiveWorker(id);
-      setWorkers(getWorkers());
+    try {
+      await addWorker({ ...newWorker, status: 'active' });
+      await loadData();
+      setNewWorker({ ...newWorker, name: '', role: '', dailyRate: 0 });
+      setShowForm(false);
+    } catch (err) {
+      alert('Failed to add worker');
     }
   };
 
-  const handleRestore = (id: string) => {
-    restoreWorker(id);
-    setWorkers(getWorkers());
+  const handleProjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProject.name) return;
+    try {
+      await addProject(newProject.name, newProject.description);
+      await loadData();
+      setNewProject({ name: '', description: '' });
+      setShowProjectForm(false);
+    } catch (err) {
+      alert('Failed to add project');
+    }
+  };
+
+  const handleArchive = async (id: string) => {
+    if (confirm('Archive this worker? They will be moved to the "Past Workers" list.')) {
+      await archiveWorker(id);
+      await loadData();
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    await restoreWorker(id);
+    await loadData();
   };
 
   const filteredWorkers = workers.filter(w => (w.status || 'active') === activeTab);
@@ -73,6 +107,10 @@ function WorkersContent() {
     ...p,
     workers: filteredWorkers.filter(w => w.projectId === p.id)
   })).filter(group => activeTab === 'archived' ? group.workers.length > 0 : true);
+
+  if (loading && workers.length === 0) {
+    return <div className="container" style={{ paddingTop: '5rem', textAlign: 'center' }}><p>Loading workers...</p></div>;
+  }
 
   return (
     <div className="container fade-in" style={{ paddingTop: '3rem', paddingBottom: '5rem' }}>
@@ -96,7 +134,7 @@ function WorkersContent() {
         </div>
         <div className={styles.headerActions}>
           <button className="btn-secondary" onClick={() => setShowProjectForm(true)}>
-            + New Project/Site
+            + New Site
           </button>
           <button className="btn-primary" onClick={() => setShowForm(true)}>
             + Add Worker
@@ -195,7 +233,7 @@ function WorkersContent() {
                 </div>
               ) : (
                 group.workers.map(worker => {
-                  const { earned, paid, balance } = getWorkerBalance(worker.id);
+                  const bal = balances[worker.id] || { earned: 0, paid: 0, balance: 0 };
                   return (
                     <div key={worker.id} className="card">
                       <div className={styles.workerCardHeader}>
@@ -214,15 +252,15 @@ function WorkersContent() {
                       <div className={styles.balanceGrid}>
                         <div className={styles.balanceItem}>
                           <span>Earned</span>
-                          <p>₹{earned}</p>
+                          <p>₹{bal.earned}</p>
                         </div>
                         <div className={styles.balanceItem}>
                           <span>Paid</span>
-                          <p>₹{paid}</p>
+                          <p>₹{bal.paid}</p>
                         </div>
-                        <div className={`${styles.balanceItem} ${balance > 0 ? styles.due : ''}`}>
+                        <div className={`${styles.balanceItem} ${bal.balance > 0 ? styles.due : ''}`}>
                           <span>Balance</span>
-                          <p>₹{balance}</p>
+                          <p>₹{bal.balance}</p>
                         </div>
                       </div>
 

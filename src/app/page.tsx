@@ -15,31 +15,56 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [todayLogs, setTodayLogs] = useState<Attendance[]>([]);
   const [totalBalance, setTotalBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const w = getWorkers();
-    const a = getAttendance();
-    const p = getPayments();
-    const proj = getProjects();
-    
-    // Filter out data from deleted workers for a clean dashboard
-    const activeWorkers = w.filter(worker => worker.status === 'active');
-    const activeAttendance = a.filter(log => activeWorkers.some(worker => worker.id === log.workerId));
-    const activePayments = p.filter(pay => activeWorkers.some(worker => worker.id === pay.workerId));
+    async function loadDashboardData() {
+      try {
+        const [w, a, p, proj] = await Promise.all([
+          getWorkers(),
+          getAttendance(),
+          getPayments(),
+          getProjects()
+        ]);
+        
+        const activeWorkers = w.filter(worker => worker.status === 'active');
+        const activeAttendance = a.filter(log => activeWorkers.some(worker => worker.id === log.workerId));
+        const activePayments = p.filter(pay => activeWorkers.some(worker => worker.id === pay.workerId));
 
-    setWorkers(activeWorkers);
-    setAttendance(activeAttendance);
-    setPayments(activePayments);
-    setProjects(proj);
+        setWorkers(activeWorkers);
+        setAttendance(activeAttendance);
+        setPayments(activePayments);
+        setProjects(proj);
 
-    const today = new Date().toISOString().split('T')[0];
-    setTodayLogs(activeAttendance.filter(log => log.date.startsWith(today)));
+        const today = new Date().toISOString().split('T')[0];
+        setTodayLogs(activeAttendance.filter(log => log.date === today));
 
-    const balance = activeWorkers.reduce((sum, worker) => {
-      return sum + getWorkerBalance(worker.id).balance;
-    }, 0);
-    setTotalBalance(balance);
+        // Calculate balances for active workers
+        const balances = await Promise.all(
+          activeWorkers.map(worker => getWorkerBalance(worker.id))
+        );
+        const total = balances.reduce((sum, b) => sum + b.balance, 0);
+        setTotalBalance(total);
+      } catch (err) {
+        console.error('Failed to load dashboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="container" style={{ paddingTop: '5rem', textAlign: 'center' }}>
+        <div className="fade-in">
+          <h2 style={{ color: 'var(--primary)', marginBottom: '1rem' }}>Loading BahiKhata...</h2>
+          <p style={{ color: '#666' }}>Fetching your latest site data from cloud</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${styles.container} container fade-in`}>
@@ -82,7 +107,7 @@ export default function Home() {
                 <p>No active logs yet.</p>
               </div>
             ) : (
-              attendance.slice(-6).reverse().map((log) => {
+              attendance.slice(0, 6).map((log) => {
                 const worker = workers.find(w => w.id === log.workerId);
                 const project = projects.find(p => p.id === log.projectId);
                 return (
@@ -109,7 +134,7 @@ export default function Home() {
                 <p>No payments recorded yet.</p>
               </div>
             ) : (
-              payments.slice(-6).reverse().map((p) => {
+              payments.slice(0, 6).map((p) => {
                 const worker = workers.find(w => w.id === p.workerId);
                 return (
                   <div key={p.id} className={`${styles.activityItem} glass`}>
@@ -126,24 +151,25 @@ export default function Home() {
         </section>
       </div>
       
-      <section className={styles.siteSummarySection}>
-        <h2 className={styles.subTitle}>Site-wise Distribution</h2>
-        <div className={styles.siteGrid}>
-          {projects.map(proj => {
-            const siteWorkers = workers.filter(w => w.projectId === proj.id);
-            const siteBalance = siteWorkers.reduce((sum, w) => sum + getWorkerBalance(w.id).balance, 0);
-            return (
-              <div key={proj.id} className="card">
-                <h4 style={{ color: 'var(--primary)', marginBottom: '0.5rem' }}>{proj.name}</h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                   <span>{siteWorkers.length} Workers</span>
-                   <span style={{ fontWeight: 700 }}>₹{siteBalance} Due</span>
+      {projects.length > 0 && (
+        <section className={styles.siteSummarySection}>
+          <h2 className={styles.subTitle}>Site-wise Distribution</h2>
+          <div className={styles.siteGrid}>
+            {projects.map(proj => {
+              const siteWorkers = workers.filter(w => w.projectId === proj.id);
+              // Note: For a live dashboard, we might want to pre-calculate these site balances
+              return (
+                <div key={proj.id} className="card">
+                  <h4 style={{ color: 'var(--primary)', marginBottom: '0.5rem' }}>{proj.name}</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                     <span>{siteWorkers.length} Workers</span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
