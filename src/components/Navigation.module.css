@@ -52,6 +52,24 @@
   color: var(--primary);
 }
 
+.logoutBtn {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+  background: none;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logoutBtn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
 @media (max-width: 640px) {
   .logoText {
     display: none;
