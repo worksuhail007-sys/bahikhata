@@ -4,13 +4,13 @@ import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import styles from '../vendors.module.css';
-import { getMaterials, Material, Project, getProjects } from '@/lib/storage';
+import { getMaterials, Material, Project, getProjects, getVendors, Vendor } from '@/lib/storage';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export default function VendorLedger({ params }: { params: Promise<{ name: string }> }) {
-  const { name: vendorNameRaw } = use(params);
-  const vendorName = decodeURIComponent(vendorNameRaw);
+export default function VendorLedger({ params }: { params: Promise<{ id: string }> }) {
+  const { id: vendorId } = use(params);
+  const [vendor, setVendor] = useState<Vendor | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,14 +19,17 @@ export default function VendorLedger({ params }: { params: Promise<{ name: strin
   useEffect(() => {
     async function loadLedger() {
       try {
-        const [m, p] = await Promise.all([getMaterials(), getProjects()]);
-        const vendorBills = m.filter(item => (item.vendor || 'Unknown Vendor') === vendorName);
+        const [m, p, v] = await Promise.all([getMaterials(), getProjects(), getVendors()]);
+        const currentVendor = v.find(ven => ven.id === vendorId);
         
-        if (vendorBills.length === 0) {
+        if (!currentVendor) {
           router.push('/materials/vendors');
           return;
         }
 
+        const vendorBills = m.filter(item => item.vendorId === vendorId);
+        
+        setVendor(currentVendor);
         setMaterials(vendorBills);
         setProjects(p);
       } catch (err) {
@@ -36,7 +39,10 @@ export default function VendorLedger({ params }: { params: Promise<{ name: strin
       }
     }
     loadLedger();
-  }, [vendorName, router]);
+  }, [vendorId, router]);
+
+  if (loading) return <div className="container" style={{ paddingTop: '5rem' }}><p>Loading ledger...</p></div>;
+  if (!vendor) return null;
 
   const summary = materials.reduce((acc, curr) => ({
     totalBilled: acc.totalBilled + curr.totalCost,
@@ -52,7 +58,7 @@ export default function VendorLedger({ params }: { params: Promise<{ name: strin
     
     doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text(`Supplier: ${vendorName}`, 14, 32);
+    doc.text(`Supplier: ${vendor.name}`, 14, 32);
     doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 14, 38);
     
     // Summary Box
@@ -82,11 +88,11 @@ export default function VendorLedger({ params }: { params: Promise<{ name: strin
       headStyles: { fillColor: [245, 158, 11] }
     });
 
-    doc.save(`Statement_${vendorName.replace(/\s+/g, '_')}.pdf`);
+    doc.save(`Statement_${vendor.name.replace(/\s+/g, '_')}.pdf`);
   };
 
   const shareWhatsApp = () => {
-    const message = `📑 *Supplier Statement: ${vendorName}*\n\n` +
+    const message = `📑 *Supplier Statement: ${vendor.name}*\n\n` +
       `💰 *Total Billed:* ₹${summary.totalBilled}\n` +
       `✅ *Total Paid:* ₹${summary.totalPaid}\n` +
       `⚖️ *Balance Owed:* ₹${summary.balance}\n\n` +
@@ -96,15 +102,15 @@ export default function VendorLedger({ params }: { params: Promise<{ name: strin
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`);
   };
 
-  if (loading) return <div className="container" style={{ paddingTop: '5rem' }}><p>Loading ledger...</p></div>;
-
   return (
     <div className="container fade-in" style={{ paddingTop: '3rem', paddingBottom: '5rem' }}>
       <header className={styles.ledgerHeader}>
         <div className={styles.vendorInfo}>
           <Link href="/materials/vendors" className={styles.backLink}>← Back to Suppliers</Link>
           <p style={{ color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.75rem' }}>Supplier Ledger</p>
-          <h1>{vendorName}</h1>
+          <h1>{vendor.name}</h1>
+          {vendor.phone && <p style={{ color: '#aaa', fontSize: '0.875rem' }}>📞 {vendor.phone}</p>}
+          {vendor.address && <p style={{ color: '#aaa', fontSize: '0.875rem' }}>📍 {vendor.address}</p>}
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button onClick={exportPDF} className="btn-secondary">📄 Download Statement</button>
@@ -132,28 +138,34 @@ export default function VendorLedger({ params }: { params: Promise<{ name: strin
       <section>
         <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem' }}>Purchase History</h2>
         <div className={styles.billList}>
-          {materials.map(item => (
-            <div key={item.id} className={`${styles.billItem} glass`}>
-              <div className={styles.billDate}>
-                {new Date(item.date).toLocaleDateString()}
-              </div>
-              <div className={styles.billMain}>
-                <h4>{item.name}</h4>
-                <p>Site: {projects.find(p => p.id === item.projectId)?.name || 'Unknown'}</p>
-                {item.notes && <p style={{ fontStyle: 'italic', color: '#666' }}>"{item.notes}"</p>}
-              </div>
-              <div className={styles.billAmount}>
-                <span>{item.quantity} {item.unit} @ ₹{item.unitPrice}</span>
-                <p>Total: ₹{item.totalCost}</p>
-              </div>
-              <div className={styles.billStatus}>
-                <span style={{ color: '#10b981', display: 'block', fontSize: '0.875rem' }}>Paid: ₹{item.amountPaid}</span>
-                <span style={{ color: (item.totalCost - item.amountPaid) > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
-                  Bal: ₹{item.totalCost - item.amountPaid}
-                </span>
-              </div>
+          {materials.length === 0 ? (
+            <div className="glass" style={{ padding: '3rem', textAlign: 'center' }}>
+               <p style={{ color: '#666' }}>No bills recorded yet.</p>
             </div>
-          ))}
+          ) : (
+            materials.map(item => (
+              <div key={item.id} className={`${styles.billItem} glass`}>
+                <div className={styles.billDate}>
+                  {new Date(item.date).toLocaleDateString()}
+                </div>
+                <div className={styles.billMain}>
+                  <h4>{item.name}</h4>
+                  <p>Site: {projects.find(p => p.id === item.projectId)?.name || 'Unknown'}</p>
+                  {item.notes && <p style={{ fontStyle: 'italic', color: '#666' }}>"{item.notes}"</p>}
+                </div>
+                <div className={styles.billAmount}>
+                  <span>{item.quantity} {item.unit} @ ₹{item.unitPrice}</span>
+                  <p>Total: ₹{item.totalCost}</p>
+                </div>
+                <div className={styles.billStatus}>
+                  <span style={{ color: '#10b981', display: 'block', fontSize: '0.875rem' }}>Paid: ₹{item.amountPaid}</span>
+                  <span style={{ color: (item.totalCost - item.amountPaid) > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
+                    Bal: ₹{item.totalCost - item.amountPaid}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>

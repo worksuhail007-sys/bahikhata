@@ -3,13 +3,14 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import styles from './materials.module.css';
-import { getMaterials, addMaterial, updateMaterial, deleteMaterial, Material, Project, getProjects } from '@/lib/storage';
+import { getMaterials, addMaterial, updateMaterial, deleteMaterial, Material, Project, getProjects, Vendor, getVendors } from '@/lib/storage';
 import ImageUpload from '@/components/ImageUpload';
 import Link from 'next/link';
 
 function MaterialsContent() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -17,8 +18,8 @@ function MaterialsContent() {
   
   const [newMaterial, setNewMaterial] = useState({
     projectId: '',
+    vendorId: '',
     name: '',
-    vendor: '',
     quantity: 1,
     unit: 'bags',
     unitPrice: 0,
@@ -33,12 +34,16 @@ function MaterialsContent() {
 
   const loadData = async () => {
     try {
-      const [p, m] = await Promise.all([getProjects(), getMaterials()]);
+      const [p, m, v] = await Promise.all([getProjects(), getMaterials(), getVendors()]);
       setProjects(p);
       setMaterials(m);
+      setVendors(v);
       
       if (p.length > 0 && !newMaterial.projectId) {
         setNewMaterial(prev => ({ ...prev, projectId: p[0].id }));
+      }
+      if (v.length > 0 && !newMaterial.vendorId) {
+        setNewMaterial(prev => ({ ...prev, vendorId: v[0].id }));
       }
     } catch (err) {
       console.error('Error loading materials:', err);
@@ -76,7 +81,6 @@ function MaterialsContent() {
       setNewMaterial({
         ...newMaterial,
         name: '',
-        vendor: '',
         quantity: 1,
         unitPrice: 0,
         totalCost: 0,
@@ -94,8 +98,8 @@ function MaterialsContent() {
   const handleEdit = (m: Material) => {
     setNewMaterial({
       projectId: m.projectId,
+      vendorId: m.vendorId || '',
       name: m.name,
-      vendor: m.vendor || '',
       quantity: m.quantity,
       unit: m.unit,
       unitPrice: m.unitPrice,
@@ -151,7 +155,8 @@ function MaterialsContent() {
                 setEditingId(null);
                 setNewMaterial({
                   projectId: projects.length > 0 ? projects[0].id : '',
-                  name: '', vendor: '', quantity: 1, unit: 'bags', unitPrice: 0, totalCost: 0, amountPaid: 0,
+                  vendorId: vendors.length > 0 ? vendors[0].id : '',
+                  name: '', quantity: 1, unit: 'bags', unitPrice: 0, totalCost: 0, amountPaid: 0,
                   date: new Date().toISOString().split('T')[0], notes: '', image: undefined
                 });
                 setShowForm(true);
@@ -205,13 +210,20 @@ function MaterialsContent() {
                 />
               </div>
               <div className={styles.inputGroup}>
-                <label>Vendor / Supplier (Optional)</label>
-                <input 
-                  type="text" 
-                  value={newMaterial.vendor} 
-                  onChange={e => setNewMaterial({...newMaterial, vendor: e.target.value})}
-                  placeholder="e.g., Sharma Hardwares"
-                />
+                <label>Vendor / Supplier</label>
+                <select 
+                  value={newMaterial.vendorId} 
+                  onChange={e => setNewMaterial({...newMaterial, vendorId: e.target.value})}
+                  required
+                >
+                  <option value="" disabled>Select a supplier</option>
+                  {vendors.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+                {vendors.length === 0 && (
+                  <small style={{ color: '#ef4444' }}>No suppliers found. Create one from the Suppliers page.</small>
+                )}
               </div>
             </div>
 
@@ -254,8 +266,8 @@ function MaterialsContent() {
             </div>
 
             <div className={styles.formRow}>
-              <div className={styles.inputGroup} style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.1)' }}>
-                <label style={{ color: '#f59e0b' }}>Total Bill Amount</label>
+              <div className={styles.inputGroup} style={{ background: 'rgba(245, 158, 11, 0.05)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.1)', justifyContent: 'center' }}>
+                <label style={{ color: '#f59e0b', marginBottom: '0.25rem' }}>Total Bill Amount</label>
                 <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#fff' }}>
                   ₹{newMaterial.totalCost}
                 </div>
@@ -267,6 +279,7 @@ function MaterialsContent() {
                   value={newMaterial.amountPaid || ''} 
                   onChange={e => setNewMaterial({...newMaterial, amountPaid: Number(e.target.value)})}
                   placeholder="How much paid to vendor?"
+                  style={{ height: '100%' }}
                 />
               </div>
             </div>
@@ -306,13 +319,14 @@ function MaterialsContent() {
         ) : (
           filteredMaterials.map(m => {
             const project = projects.find(p => p.id === m.projectId);
+            const vendor = vendors.find(v => v.id === m.vendorId);
             const balance = m.totalCost - m.amountPaid;
             return (
               <div key={m.id} className={styles.materialItem}>
                 <div className={styles.materialHeader}>
                   <div>
                     <h3 className={styles.materialName}>{m.name}</h3>
-                    <p className={styles.vendorName}>{m.vendor || 'Unknown Vendor'}</p>
+                    <p className={styles.vendorName}>{vendor?.name || 'Unknown Vendor'}</p>
                   </div>
                   <span className={styles.materialDate}>{new Date(m.date).toLocaleDateString()}</span>
                 </div>

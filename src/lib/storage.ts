@@ -40,8 +40,8 @@ export interface Payment {
 export interface Material {
   id: string;
   projectId: string;
+  vendorId?: string;
   name: string;
-  vendor?: string;
   quantity: number;
   unit: string;
   unitPrice: number;
@@ -50,6 +50,14 @@ export interface Material {
   date: string;
   notes?: string;
   image?: string;
+}
+
+export interface Vendor {
+  id: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  createdAt?: string;
 }
 
 // --- Projects ---
@@ -279,6 +287,22 @@ export const updatePayment = async (id: string, updates: Partial<Payment>) => {
   return { ...data, workerId: data.worker_id, amount: Number(data.amount), image: data.image_url };
 };
 
+// --- Vendors ---
+export const getVendors = async (): Promise<Vendor[]> => {
+  const { data, error } = await supabase.from('vendors').select('*').order('name');
+  if (error) {
+    console.error('Error fetching vendors:', error);
+    return [];
+  }
+  return data;
+};
+
+export const addVendor = async (vendor: Omit<Vendor, 'id'>) => {
+  const { data, error } = await supabase.from('vendors').insert([vendor]).select().single();
+  if (error) throw error;
+  return data;
+};
+
 // --- Materials ---
 export const getMaterials = async (): Promise<Material[]> => {
   const { data, error } = await supabase
@@ -294,6 +318,7 @@ export const getMaterials = async (): Promise<Material[]> => {
   return (data || []).map(m => ({
     ...m,
     projectId: m.project_id,
+    vendorId: m.vendor_id,
     unitPrice: Number(m.unit_price),
     totalCost: Number(m.total_cost),
     amountPaid: Number(m.amount_paid),
@@ -306,8 +331,8 @@ export const addMaterial = async (material: Omit<Material, 'id'>) => {
     .from('materials')
     .insert([{
       project_id: material.projectId,
+      vendor_id: material.vendorId,
       name: material.name,
-      vendor: material.vendor,
       quantity: material.quantity,
       unit: material.unit,
       unit_price: material.unitPrice,
@@ -324,6 +349,7 @@ export const addMaterial = async (material: Omit<Material, 'id'>) => {
   return { 
     ...data, 
     projectId: data.project_id, 
+    vendorId: data.vendor_id,
     unitPrice: Number(data.unit_price), 
     totalCost: Number(data.total_cost), 
     amountPaid: Number(data.amount_paid),
@@ -341,8 +367,8 @@ export const updateMaterial = async (id: string, updates: Partial<Material>) => 
     .from('materials')
     .update({
       project_id: updates.projectId,
+      vendor_id: updates.vendorId,
       name: updates.name,
-      vendor: updates.vendor,
       quantity: updates.quantity,
       unit: updates.unit,
       unit_price: updates.unitPrice,
@@ -360,6 +386,7 @@ export const updateMaterial = async (id: string, updates: Partial<Material>) => 
   return { 
     ...data, 
     projectId: data.project_id, 
+    vendorId: data.vendor_id,
     unitPrice: Number(data.unit_price), 
     totalCost: Number(data.total_cost), 
     amountPaid: Number(data.amount_paid),
