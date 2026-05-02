@@ -5,7 +5,7 @@ import Link from 'next/link';
 import styles from './page.module.css';
 import { 
   getWorkers, getAttendance, getPayments, getMaterials, Worker, Attendance, 
-  Payment, Material, getWorkerBalance, getProjects, Project 
+  Payment, Material, getWorkerBalance, getProjects, Project, getVendorPayments, VendorPayment 
 } from '@/lib/storage';
 
 export default function Home() {
@@ -15,7 +15,8 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [todayLogs, setTodayLogs] = useState<Attendance[]>([]);
-  const [totalBalance, setTotalBalance] = useState(0);
+  const [totalWorkerBalance, setTotalWorkerBalance] = useState(0);
+  const [totalWorkerPaid, setTotalWorkerPaid] = useState(0);
   const [totalMaterialCost, setTotalMaterialCost] = useState(0);
   const [totalMaterialPaid, setTotalMaterialPaid] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -23,12 +24,13 @@ export default function Home() {
   useEffect(() => {
     async function loadDashboardData() {
       try {
-        const [w, a, p, proj, m] = await Promise.all([
+        const [w, a, p, proj, m, vp] = await Promise.all([
           getWorkers(),
           getAttendance(),
           getPayments(),
           getProjects(),
-          getMaterials()
+          getMaterials(),
+          getVendorPayments()
         ]);
         
         const activeWorkers = w.filter(worker => worker.status === 'active');
@@ -44,18 +46,23 @@ export default function Home() {
         const today = new Date().toISOString().split('T')[0];
         setTodayLogs(activeAttendance.filter(log => log.date === today));
 
-        // Calculate balances for active workers
+        // Calculate Worker Stats
         const balances = await Promise.all(
           activeWorkers.map(worker => getWorkerBalance(worker.id))
         );
         const totalBal = balances.reduce((sum, b) => sum + b.balance, 0);
-        setTotalBalance(totalBal);
+        setTotalWorkerBalance(totalBal);
         
-        // Calculate Total Material Cost & Paid
+        const totalWPaid = p.reduce((sum, pay) => sum + pay.amount, 0);
+        setTotalWorkerPaid(totalWPaid);
+        
+        // Calculate Supplier Stats
         const totalMatCost = m.reduce((sum, mat) => sum + mat.totalCost, 0);
-        const totalMatPaid = m.reduce((sum, mat) => sum + mat.amountPaid, 0);
+        const totalMatPaidOnBills = m.reduce((sum, mat) => sum + mat.amountPaid, 0);
+        const totalLumpSumPaid = vp.reduce((sum, pay) => sum + pay.amount, 0);
+        
         setTotalMaterialCost(totalMatCost);
-        setTotalMaterialPaid(totalMatPaid);
+        setTotalMaterialPaid(totalMatPaidOnBills + totalLumpSumPaid);
 
       } catch (err) {
         console.error('Failed to load dashboard:', err);
@@ -79,15 +86,7 @@ export default function Home() {
   }
 
   const matBalance = totalMaterialCost - totalMaterialPaid;
-  const grandTotalCost = totalMaterialCost + (attendance.reduce((sum, a) => {
-      // Crude estimation of total earned for active workers since start
-      // This is simplified for dashboard display
-      const w = workers.find(work => work.id === a.workerId);
-      if(!w) return sum;
-      return sum + (a.status === 'Half' ? w.dailyRate/2 : w.dailyRate) + (a.overtimeAmount || 0);
-  }, 0));
-  
-  const grandTotalDue = totalBalance + matBalance;
+  const grandTotalDue = totalWorkerBalance + matBalance;
 
   return (
     <div className={`${styles.container} container fade-in`}>
@@ -103,21 +102,31 @@ export default function Home() {
         </div>
       </header>
 
-      <div className={styles.statsGrid}>
+      <div className={styles.statsGrid} style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
         <div className="card">
           <p className={styles.statLabel}>Active Workers</p>
           <h3 className={styles.statValue}>{workers.length}</h3>
           <p className={styles.statSub}>Across {projects.length} sites</p>
         </div>
         <div className="card">
-          <p className={styles.statLabel}>Total Balance Due</p>
-          <h3 className={`${styles.statValue} ${grandTotalDue > 0 ? styles.due : ''}`}>₹{grandTotalDue}</h3>
-          <p className={styles.statSub}>Labour (₹{totalBalance}) + Materials (₹{matBalance})</p>
+          <p className={styles.statLabel}>Paid to Workers</p>
+          <h3 className={styles.statValue} style={{ color: '#10b981' }}>₹{totalWorkerPaid}</h3>
+          <p className={styles.statSub}>Total advances/salaries given</p>
         </div>
         <div className="card">
-          <p className={styles.statLabel}>Material Payments</p>
+          <p className={styles.statLabel}>Paid to Suppliers</p>
           <h3 className={styles.statValue} style={{ color: '#10b981' }}>₹{totalMaterialPaid}</h3>
-          <p className={styles.statSub}>Paid out of ₹{totalMaterialCost}</p>
+          <p className={styles.statSub}>Out of ₹{totalMaterialCost} billed</p>
+        </div>
+        <div className="card" style={{ border: totalWorkerBalance > 0 ? '1px solid rgba(239, 68, 68, 0.3)' : '' }}>
+          <p className={styles.statLabel}>Balance: Workers</p>
+          <h3 className={`${styles.statValue} ${totalWorkerBalance > 0 ? styles.due : ''}`}>₹{totalWorkerBalance}</h3>
+          <p className={styles.statSub}>Owed to labour right now</p>
+        </div>
+        <div className="card" style={{ border: matBalance > 0 ? '1px solid rgba(239, 68, 68, 0.3)' : '' }}>
+          <p className={styles.statLabel}>Balance: Suppliers</p>
+          <h3 className={`${styles.statValue} ${matBalance > 0 ? styles.due : ''}`}>₹{matBalance}</h3>
+          <p className={styles.statSub}>Owed for materials</p>
         </div>
       </div>
 
