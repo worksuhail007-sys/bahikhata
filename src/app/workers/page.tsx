@@ -5,9 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import styles from './workers.module.css';
 import { 
-  getWorkers, addWorker, Worker, getWorkerBalance, archiveWorker, 
+  getWorkers, addWorker, updateWorker, Worker, getWorkerBalance, archiveWorker, 
   restoreWorker, deleteWorkerWithHistory, getProjects, addProject, Project 
 } from '@/lib/storage';
+import ImageUpload from '@/components/ImageUpload';
 
 function WorkersContent() {
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -18,7 +19,8 @@ function WorkersContent() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   
-  const [newWorker, setNewWorker] = useState({ name: '', role: '', dailyRate: 0, projectId: '' });
+  const [newWorker, setNewWorker] = useState<{name: string; role: string; dailyRate: number; projectId: string; image?: string}>({ name: '', role: '', dailyRate: 0, projectId: '' });
+  const [editingWorkerId, setEditingWorkerId] = useState<string | null>(null);
   const [newProject, setNewProject] = useState({ name: '', description: '' });
 
   const searchParams = useSearchParams();
@@ -66,12 +68,41 @@ function WorkersContent() {
     if (!newWorker.name || !newWorker.role || !newWorker.projectId) return;
     
     try {
-      await addWorker({ ...newWorker, status: 'active' });
+      if (editingWorkerId) {
+        await updateWorker(editingWorkerId, newWorker);
+      } else {
+        await addWorker({ ...newWorker, status: 'active' });
+      }
       await loadData();
-      setNewWorker({ ...newWorker, name: '', role: '', dailyRate: 0 });
+      setNewWorker({ name: '', role: '', dailyRate: 0, projectId: projects[0]?.id || '', image: undefined });
+      setEditingWorkerId(null);
       setShowForm(false);
     } catch (err) {
-      alert('Failed to add worker');
+      alert('Failed to save worker');
+    }
+  };
+
+  const handleEditWorker = (worker: Worker) => {
+    setNewWorker({
+      name: worker.name,
+      role: worker.role,
+      dailyRate: worker.dailyRate,
+      projectId: worker.projectId || '',
+      image: worker.image
+    });
+    setEditingWorkerId(worker.id);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDeleteWorker = async (id: string) => {
+    if (confirm('Are you sure you want to permanently delete this worker and all their history? This cannot be undone.')) {
+      try {
+        await deleteWorkerWithHistory(id);
+        await loadData();
+      } catch (err) {
+        alert('Failed to delete worker');
+      }
     }
   };
 
@@ -136,7 +167,11 @@ function WorkersContent() {
           <button className="btn-secondary" onClick={() => setShowProjectForm(true)}>
             + New Site
           </button>
-          <button className="btn-primary" onClick={() => setShowForm(true)}>
+          <button className="btn-primary" onClick={() => {
+            setEditingWorkerId(null);
+            setNewWorker({ name: '', role: '', dailyRate: 0, projectId: projects.length > 0 ? projects[0].id : '', image: undefined });
+            setShowForm(true);
+          }}>
             + Add Worker
           </button>
         </div>
@@ -166,7 +201,7 @@ function WorkersContent() {
 
       {showForm && (
         <section className={`${styles.formSection} card`}>
-          <h2 className={styles.formTitle}>Add New Worker</h2>
+          <h2 className={styles.formTitle}>{editingWorkerId ? 'Edit Worker' : 'Add New Worker'}</h2>
           <form onSubmit={handleWorkerSubmit} className={styles.form}>
             <div className={styles.formRow}>
               <div className={styles.inputGroup}>
@@ -210,9 +245,22 @@ function WorkersContent() {
                 />
               </div>
             </div>
+            <div className={styles.formRow}>
+              <div className={styles.inputGroup} style={{ flex: '1 1 100%' }}>
+                <label>Profile Picture</label>
+                <ImageUpload 
+                  currentImage={newWorker.image}
+                  onImageAction={(base64) => setNewWorker({...newWorker, image: base64})} 
+                />
+              </div>
+            </div>
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary">Save Worker</button>
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="submit" className="btn-primary">{editingWorkerId ? 'Update Worker' : 'Save Worker'}</button>
+              <button type="button" className="btn-secondary" onClick={() => { 
+                setShowForm(false); 
+                setEditingWorkerId(null); 
+                setNewWorker({ name: '', role: '', dailyRate: 0, projectId: projects[0]?.id || '', image: undefined }); 
+              }}>Cancel</button>
             </div>
           </form>
         </section>
@@ -237,12 +285,20 @@ function WorkersContent() {
                   return (
                     <div key={worker.id} className="card">
                       <div className={styles.workerCardHeader}>
-                        <div className={styles.workerAvatar}>{worker.name.charAt(0)}</div>
-                        <div className={styles.workerActions}>
-                          {activeTab === 'active' ? (
-                            <button onClick={() => handleArchive(worker.id)}>📦</button>
+                        <div className={styles.workerAvatar}>
+                          {worker.image ? (
+                            <img src={worker.image} alt={worker.name} className={styles.avatarImage} />
                           ) : (
-                            <button onClick={() => handleRestore(worker.id)}>🔄</button>
+                            worker.name.charAt(0)
+                          )}
+                        </div>
+                        <div className={styles.workerActions}>
+                          <button onClick={() => handleEditWorker(worker)} title="Edit Worker">✏️</button>
+                          <button onClick={() => handleDeleteWorker(worker.id)} title="Delete Worker">🗑️</button>
+                          {activeTab === 'active' ? (
+                            <button onClick={() => handleArchive(worker.id)} title="Archive">📦</button>
+                          ) : (
+                            <button onClick={() => handleRestore(worker.id)} title="Restore">🔄</button>
                           )}
                         </div>
                       </div>

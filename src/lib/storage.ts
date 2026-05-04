@@ -15,6 +15,7 @@ export interface Worker {
   dailyRate: number;
   status?: 'active' | 'archived';
   projectId?: string;
+  image?: string;
 }
 
 export interface Attendance {
@@ -109,7 +110,8 @@ export const getWorkers = async (): Promise<Worker[]> => {
   return (data || []).map(w => ({
     ...w,
     dailyRate: Number(w.daily_rate),
-    projectId: w.project_id
+    projectId: w.project_id,
+    image: w.image_url
   }));
 };
 
@@ -121,13 +123,14 @@ export const addWorker = async (worker: Omit<Worker, 'id'>) => {
       role: worker.role,
       daily_rate: worker.dailyRate,
       status: worker.status || 'active',
-      project_id: worker.projectId
+      project_id: worker.projectId,
+      image_url: worker.image
     }])
     .select()
     .single();
 
   if (error) throw error;
-  return { ...data, dailyRate: Number(data.daily_rate), projectId: data.project_id };
+  return { ...data, dailyRate: Number(data.daily_rate), projectId: data.project_id, image: data.image_url };
 };
 
 export const archiveWorker = async (workerId: string) => {
@@ -154,14 +157,15 @@ export const updateWorker = async (id: string, updates: Partial<Worker>) => {
       role: updates.role,
       daily_rate: updates.dailyRate,
       status: updates.status,
-      project_id: updates.projectId
+      project_id: updates.projectId,
+      image_url: updates.image
     })
     .eq('id', id)
     .select()
     .single();
   
   if (error) throw error;
-  return { ...data, dailyRate: Number(data.daily_rate), projectId: data.project_id };
+  return { ...data, dailyRate: Number(data.daily_rate), projectId: data.project_id, image: data.image_url };
 };
 
 export const deleteWorkerWithHistory = async (workerId: string) => {
