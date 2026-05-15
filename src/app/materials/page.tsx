@@ -381,6 +381,10 @@ function MaterialsContent() {
                   </div>
                 </div>
 
+                {m.notes && (
+                  <p style={{ fontStyle: 'italic', color: '#666', fontSize: '0.875rem', marginTop: '0.5rem', marginBottom: '-0.5rem' }}>Note: "{m.notes}"</p>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                    <div className={styles.detailItem}>
                       <span className={styles.detailLabel}>Paid</span>

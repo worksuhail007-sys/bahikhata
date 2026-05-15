@@ -65,13 +65,16 @@ export default function WorkerLedger({ params }: { params: Promise<{ id: string 
     doc.text(`Total Paid: Rs. ${balance.paid}`, 14, 60);
     doc.text(`Current Balance: Rs. ${balance.balance}`, 14, 66);
 
-    const tableData = ledger.map(item => [
-      new Date(item.date).toLocaleDateString(),
-      item.type === 'attendance' ? `Work Log (${item.status})` : 'Payment',
-      item.projectId ? projects.find(p => p.id === item.projectId)?.name || '-' : '-',
-      item.type === 'attendance' ? `Rs. ${item.status === 'Half' ? worker.dailyRate/2 : worker.dailyRate}${item.overtimeAmount > 0 ? ' + '+item.overtimeAmount : ''}` : '-',
-      item.type === 'payment' ? `Rs. ${item.amount}` : '-'
-    ]);
+    const tableData = ledger.map(item => {
+      const noteString = item.notes ? `\nNote: ${item.notes}` : '';
+      return [
+        new Date(item.date).toLocaleDateString(),
+        (item.type === 'attendance' ? `Work Log (${item.status})` : 'Payment') + noteString,
+        item.projectId ? projects.find(p => p.id === item.projectId)?.name || '-' : '-',
+        item.type === 'attendance' ? `Rs. ${item.status === 'Half' ? worker.dailyRate/2 : worker.dailyRate}${item.overtimeAmount > 0 ? ' + '+item.overtimeAmount : ''}` : '-',
+        item.type === 'payment' ? `Rs. ${item.amount}` : '-'
+      ];
+    });
 
     autoTable(doc, {
       startY: 75,

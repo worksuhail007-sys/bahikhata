@@ -87,14 +87,15 @@ export default function VendorLedger({ params }: { params: Promise<{ id: string 
 
   // Combine bills and payments for the ledger timeline
   type LedgerEntry = 
-    | { type: 'bill'; id: string; date: string; title: string; subtitle: string; amount: number; paid: number; notes: string }
+    | { type: 'bill'; id: string; date: string; title: string; subtitle: string; amount: number; paid: number; notes: string; quantity?: number; unit?: string }
     | { type: 'payment'; id: string; date: string; title: string; amount: number; notes: string };
 
   const ledgerEntries: LedgerEntry[] = [
     ...materials.map(m => ({
       type: 'bill' as const, id: m.id, date: m.date, title: m.name, 
       subtitle: projects.find(p => p.id === m.projectId)?.name || 'Unknown',
-      amount: m.totalCost, paid: m.amountPaid, notes: m.notes || ''
+      amount: m.totalCost, paid: m.amountPaid, notes: m.notes || '',
+      quantity: m.quantity, unit: m.unit
     })),
     ...vendorPayments.map(p => ({
       type: 'payment' as const, id: p.id, date: p.date, title: 'Lump-Sum Payment', 
@@ -124,18 +125,21 @@ export default function VendorLedger({ params }: { params: Promise<{ id: string 
 
     const tableData = ledgerEntries.map(item => {
       if (item.type === 'bill') {
+        const qtyString = item.quantity ? ` (${item.quantity} ${item.unit || ''})` : '';
+        const noteString = item.notes ? `\nNote: ${item.notes}` : '';
         return [
           new Date(item.date).toLocaleDateString(),
-          item.title,
+          `${item.title}${qtyString}${noteString}`,
           item.subtitle,
           `Rs. ${item.amount}`,
           `Rs. ${item.paid}`,
           `Rs. ${item.amount - item.paid}`
         ];
       } else {
+        const noteString = item.notes ? `\nNote: ${item.notes}` : '';
         return [
           new Date(item.date).toLocaleDateString(),
-          'Payment',
+          `Payment${noteString}`,
           '-',
           '-',
           `Rs. ${item.amount}`,
@@ -261,9 +265,11 @@ export default function VendorLedger({ params }: { params: Promise<{ id: string 
                   {new Date(item.date).toLocaleDateString()}
                 </div>
                 <div className={styles.billMain}>
-                  <h4 style={{ color: item.type === 'payment' ? '#10b981' : '#fff' }}>{item.title}</h4>
+                  <h4 style={{ color: item.type === 'payment' ? '#10b981' : '#fff' }}>
+                    {item.title} {item.type === 'bill' && item.quantity ? `(${item.quantity} ${item.unit || ''})` : ''}
+                  </h4>
                   {item.type === 'bill' && <p>Site: {item.subtitle}</p>}
-                  {item.notes && <p style={{ fontStyle: 'italic', color: '#666' }}>"{item.notes}"</p>}
+                  {item.notes && <p style={{ fontStyle: 'italic', color: '#666' }}>Note: "{item.notes}"</p>}
                 </div>
                 {item.type === 'bill' ? (
                   <>
