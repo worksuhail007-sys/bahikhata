@@ -11,6 +11,7 @@ export default function VendorsPage() {
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [newVendor, setNewVendor] = useState({
     name: '',
@@ -37,8 +38,9 @@ export default function VendorsPage() {
 
   const handleAddVendor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newVendor.name) return;
+    if (!newVendor.name || isSaving) return;
     
+    setIsSaving(true);
     try {
       await addVendor(newVendor);
       await loadData();
@@ -47,6 +49,8 @@ export default function VendorsPage() {
     } catch (err) {
       alert('Failed to add supplier. Ensure the name is unique.');
       console.error(err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -130,8 +134,10 @@ export default function VendorsPage() {
               />
             </div>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-              <button type="submit" className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>Save Supplier</button>
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn-primary" style={{ background: isSaving ? '#9ca3af' : '#f59e0b', color: '#fff', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+                {isSaving ? 'Saving...' : 'Save Supplier'}
+              </button>
+              <button type="button" disabled={isSaving} className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
             </div>
           </form>
         </div>

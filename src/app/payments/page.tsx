@@ -12,6 +12,7 @@ function PaymentsContent() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [newPayment, setNewPayment] = useState({
     workerId: '',
@@ -44,8 +45,9 @@ function PaymentsContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPayment.workerId || !newPayment.amount) return;
+    if (!newPayment.workerId || !newPayment.amount || isSaving) return;
 
+    setIsSaving(true);
     try {
       await addPayment(newPayment);
       await loadData();
@@ -53,6 +55,8 @@ function PaymentsContent() {
       setShowForm(false);
     } catch (err) {
       alert('Failed to save payment');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -148,8 +152,10 @@ function PaymentsContent() {
               <ImageUpload onImageAction={(base64) => setNewPayment({...newPayment, image: base64})} />
             </div>
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary">Save Payment</button>
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn-primary" style={{ background: isSaving ? '#9ca3af' : '', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+                {isSaving ? 'Saving...' : 'Save Payment'}
+              </button>
+              <button type="button" disabled={isSaving} className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
             </div>
           </form>
         </section>

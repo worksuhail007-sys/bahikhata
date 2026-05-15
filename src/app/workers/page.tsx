@@ -17,6 +17,7 @@ function WorkersContent() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   
   const [newWorker, setNewWorker] = useState<{name: string; role: string; dailyRate: number; projectId: string; image?: string}>({ name: '', role: '', dailyRate: 0, projectId: '' });
@@ -65,8 +66,9 @@ function WorkersContent() {
 
   const handleWorkerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newWorker.name || !newWorker.role || !newWorker.projectId) return;
+    if (!newWorker.name || !newWorker.role || !newWorker.projectId || isSaving) return;
     
+    setIsSaving(true);
     try {
       if (editingWorkerId) {
         await updateWorker(editingWorkerId, newWorker);
@@ -79,6 +81,8 @@ function WorkersContent() {
       setShowForm(false);
     } catch (err) {
       alert('Failed to save worker');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -108,7 +112,9 @@ function WorkersContent() {
 
   const handleProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProject.name) return;
+    if (!newProject.name || isSaving) return;
+    
+    setIsSaving(true);
     try {
       await addProject(newProject.name, newProject.description);
       await loadData();
@@ -116,6 +122,8 @@ function WorkersContent() {
       setShowProjectForm(false);
     } catch (err) {
       alert('Failed to add project');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -192,8 +200,10 @@ function WorkersContent() {
               />
             </div>
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary">Create Project</button>
-              <button type="button" className="btn-secondary" onClick={() => setShowProjectForm(false)}>Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn-primary" style={{ background: isSaving ? '#9ca3af' : '', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+                {isSaving ? 'Saving...' : 'Create Project'}
+              </button>
+              <button type="button" disabled={isSaving} className="btn-secondary" onClick={() => setShowProjectForm(false)}>Cancel</button>
             </div>
           </form>
         </section>
@@ -255,8 +265,10 @@ function WorkersContent() {
               </div>
             </div>
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary">{editingWorkerId ? 'Update Worker' : 'Save Worker'}</button>
-              <button type="button" className="btn-secondary" onClick={() => { 
+              <button type="submit" disabled={isSaving} className="btn-primary" style={{ background: isSaving ? '#9ca3af' : '', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+                {isSaving ? 'Saving...' : (editingWorkerId ? 'Update Worker' : 'Save Worker')}
+              </button>
+              <button type="button" disabled={isSaving} className="btn-secondary" onClick={() => { 
                 setShowForm(false); 
                 setEditingWorkerId(null); 
                 setNewWorker({ name: '', role: '', dailyRate: 0, projectId: projects[0]?.id || '', image: undefined }); 

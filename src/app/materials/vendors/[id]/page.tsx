@@ -16,6 +16,7 @@ export default function VendorLedger({ params }: { params: Promise<{ id: string 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [newPayment, setNewPayment] = useState({
     amount: 0,
     date: new Date().toISOString().split('T')[0],
@@ -52,7 +53,9 @@ export default function VendorLedger({ params }: { params: Promise<{ id: string 
 
   const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPayment.amount || newPayment.amount <= 0) return;
+    if (!newPayment.amount || newPayment.amount <= 0 || isSaving) return;
+    
+    setIsSaving(true);
     try {
       await addVendorPayment({ ...newPayment, vendorId });
       const vp = await getVendorPayments();
@@ -61,6 +64,8 @@ export default function VendorLedger({ params }: { params: Promise<{ id: string 
       setShowPaymentForm(false);
     } catch (err) {
       alert('Failed to save payment');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -229,8 +234,10 @@ export default function VendorLedger({ params }: { params: Promise<{ id: string 
               />
             </div>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-              <button type="submit" className="btn-primary" style={{ background: '#3b82f6', color: '#fff', border: 'none' }}>Save Payment</button>
-              <button type="button" className="btn-secondary" onClick={() => setShowPaymentForm(false)}>Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn-primary" style={{ background: isSaving ? '#9ca3af' : '#3b82f6', color: '#fff', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+                {isSaving ? 'Saving...' : 'Save Payment'}
+              </button>
+              <button type="button" disabled={isSaving} className="btn-secondary" onClick={() => setShowPaymentForm(false)}>Cancel</button>
             </div>
           </form>
         </div>

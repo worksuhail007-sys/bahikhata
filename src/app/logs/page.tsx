@@ -19,6 +19,7 @@ function LogsContent() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [showArchived, setShowArchived] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [newLog, setNewLog] = useState({
     workerIds: [] as string[],
@@ -83,8 +84,9 @@ function LogsContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newLog.workerIds.length === 0 || !newLog.projectId) return;
+    if (newLog.workerIds.length === 0 || !newLog.projectId || isSaving) return;
 
+    setIsSaving(true);
     try {
       const promises = newLog.workerIds.map(workerId => 
         logAttendance({
@@ -104,6 +106,8 @@ function LogsContent() {
       setShowForm(false);
     } catch (err) {
       alert('Failed to save log');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -288,8 +292,10 @@ function LogsContent() {
               <ImageUpload onImageAction={(base64) => setNewLog({...newLog, image: base64})} />
             </div>
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary">Save Log</button>
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn-primary" style={{ background: isSaving ? '#9ca3af' : '', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+                {isSaving ? 'Saving...' : 'Save Log'}
+              </button>
+              <button type="button" disabled={isSaving} className="btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
             </div>
           </form>
         </section>

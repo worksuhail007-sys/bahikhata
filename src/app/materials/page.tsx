@@ -13,6 +13,7 @@ function MaterialsContent() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'All' | string>('All');
   const [isCustomMaterial, setIsCustomMaterial] = useState(false);
@@ -70,8 +71,9 @@ function MaterialsContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMaterial.projectId || !newMaterial.name || newMaterial.totalCost <= 0) return;
+    if (!newMaterial.projectId || !newMaterial.name || newMaterial.totalCost <= 0 || isSaving) return;
 
+    setIsSaving(true);
     try {
       if (editingId) {
         await updateMaterial(editingId, newMaterial);
@@ -93,6 +95,8 @@ function MaterialsContent() {
       setEditingId(null);
     } catch (err) {
       alert('Failed to save material entry');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -338,10 +342,10 @@ function MaterialsContent() {
             </div>
             
             <div className={styles.formActions}>
-              <button type="submit" className="btn-primary" style={{ background: '#f59e0b', color: '#fff', border: 'none' }}>
-                {editingId ? 'Update Entry' : 'Save Entry'}
+              <button type="submit" disabled={isSaving} className="btn-primary" style={{ background: isSaving ? '#9ca3af' : '#f59e0b', color: '#fff', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer' }}>
+                {isSaving ? 'Saving...' : (editingId ? 'Update Entry' : 'Save Entry')}
               </button>
-              <button type="button" className="btn-secondary" onClick={() => {
+              <button type="button" disabled={isSaving} className="btn-secondary" onClick={() => {
                 setShowForm(false);
                 setEditingId(null);
               }}>Cancel</button>
